@@ -51,6 +51,7 @@ import {
 } from '../store/store'
 import {
   FlowLayer,
+  FlowMarkers,
   Guides,
   HoverOutline,
   ScreenLabels,
@@ -811,18 +812,17 @@ export function Canvas() {
             dropTarget={overlay.dropScreenId === s.id || overlay.connect?.target === s.id}
           />
         ))}
+        {showFlows && (
+          <FlowLayer
+            project={project}
+            edges={edges}
+            modeId={modeId}
+            focus={[...focusElementIds, ...focusScreenIds].join(',')}
+          />
+        )}
       </div>
 
-      {showFlows && (
-        <FlowLayer
-          project={project}
-          edges={edges}
-          camera={camera}
-          modeId={modeId}
-          focusElementIds={focusElementIds}
-          focusScreenIds={focusScreenIds}
-        />
-      )}
+      {showFlows && <FlowMarkers zoom={camera.zoom} />}
 
       <ScreenLabels
         project={project}

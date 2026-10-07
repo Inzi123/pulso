@@ -1542,22 +1542,36 @@ a:focus-visible {
   pointer-events: none;
   overflow: visible;
 }
+.world-flows,
+.flow-markers {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+.flow-markers {
+  width: 0;
+  height: 0;
+}
 .flow-line {
   fill: none;
   stroke: var(--select);
   stroke-width: 2;
+  vector-effect: non-scaling-stroke;
 }
-.flow-dim .flow-line,
-.flow-dim .flow-dot {
-  opacity: 0.22;
+.flow-line.flow-dim {
+  opacity: 0.2;
 }
-.flow-focus .flow-line {
+.flow-line.flow-focus {
   stroke-width: 2.5;
 }
-.flow-overlay .flow-line {
+.flow-line.flow-overlay {
   stroke-dasharray: 7 4;
 }
-.flow-broken .flow-line {
+.flow-line.flow-broken {
   stroke: var(--danger);
   stroke-dasharray: 4 4;
 }
@@ -1566,15 +1580,12 @@ a:focus-visible {
   stroke: var(--select);
   stroke-width: 2;
 }
-.flow-broken .flow-dot {
+.flow-dot-broken {
   stroke: var(--danger);
 }
-.flow-head-ok {
-  fill: var(--select);
-}
+.flow-head-ok,
 .flow-head-dim {
   fill: var(--select);
-  opacity: 0.22;
 }
 .flow-head-broken {
   fill: var(--danger);

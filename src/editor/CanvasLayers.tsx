@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, type CSSProperties } from 'react'
 import type { Camera, Handle, SnapGuide } from '../model/geometry'
 import { worldToScreen } from '../model/geometry'
 import type { FlowEdge } from '../model/flows'
@@ -195,10 +195,9 @@ function RenameInput({ initial, onDone }: { initial: string; onDone: (name: stri
 interface FlowLayerProps {
   project: Project
   edges: FlowEdge[]
-  camera: Camera
   modeId: Id
-  focusElementIds: Id[]
-  focusScreenIds: Id[]
+  /** Ids enfocados (elementos o pantallas seleccionados) separados por comas. */
+  focus: string
 }
 
 export function flowPath(from: Rect, to: Rect) {
@@ -227,58 +226,87 @@ export function flowPath(from: Rect, to: Rect) {
   return { d: `M${sx},${sy} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${ex},${ey}`, sx, sy, ex, ey }
 }
 
-export function FlowLayer({ project, edges, camera, modeId, focusElementIds, focusScreenIds }: FlowLayerProps) {
-  const screens = new Map(project.screens.map((s) => [s.id, s]))
-  const hasFocus = focusElementIds.length > 0 || focusScreenIds.length > 0
-  const toScreen = (r: Rect): Rect => {
-    const p = worldToScreen(camera, r.x, r.y)
-    return { x: p.x, y: p.y, width: r.width * camera.zoom, height: r.height * camera.zoom }
-  }
-  return (
-    <svg className="flow-layer">
-      <defs>
-        {['ok', 'broken', 'dim'].map((k) => (
-          <marker
-            key={k}
-            id={`arrow-${k}`}
-            viewBox="0 0 10 10"
-            refX="8"
-            refY="5"
-            markerWidth="9"
-            markerHeight="9"
-            markerUnits="userSpaceOnUse"
-            orient="auto-start-reverse"
-          >
-            <path d="M0,0 L10,5 L0,10 z" className={`flow-head flow-head-${k}`} />
-          </marker>
-        ))}
-      </defs>
-      {edges.map((edge) => {
+/**
+ * Flechas de los flujos en coordenadas del lienzo: viven dentro del mundo
+ * transformado, así que mover o hacer zoom no las vuelve a calcular. El trazo
+ * no escala; las puntas y los puntos se ajustan al zoom en <FlowMarkers>.
+ */
+export const FlowLayer = memo(function FlowLayer({ project, edges, modeId, focus }: FlowLayerProps) {
+  const screens = useMemo(() => new Map(project.screens.map((s) => [s.id, s])), [project.screens])
+  const focusSet = useMemo(() => new Set(focus ? focus.split(',') : []), [focus])
+  const paths = useMemo(
+    () =>
+      edges.flatMap((edge) => {
         const from = screens.get(edge.fromScreenId)
         const to = screens.get(edge.toScreenId)
-        if (!from || !to || from.id === to.id) return null
+        if (!from || !to || from.id === to.id) return []
         const el = from.elements.find((e) => e.id === edge.fromElementId)
-        if (!el) return null
+        if (!el) return []
         const p = resolveProps(el, modeId)
-        const a = toScreen({ x: from.x + p.x, y: from.y + p.y, width: p.width, height: p.height })
-        const b = toScreen({ x: to.x, y: to.y, width: to.width, height: to.height })
-        const { d, sx, sy } = flowPath(a, b)
+        const a = { x: from.x + p.x, y: from.y + p.y, width: p.width, height: p.height }
+        const b = { x: to.x, y: to.y, width: to.width, height: to.height }
+        return [{ edge, d: flowPath(a, b).d }]
+      }),
+    [edges, screens, modeId],
+  )
+  return (
+    <svg className="world-flows" aria-hidden="true">
+      {paths.map(({ edge, d }) => {
         const focused =
-          focusElementIds.includes(edge.fromElementId) ||
-          focusScreenIds.includes(edge.fromScreenId) ||
-          focusScreenIds.includes(edge.toScreenId)
-        const dim = hasFocus && !focused
+          focusSet.has(edge.fromElementId) || focusSet.has(edge.fromScreenId) || focusSet.has(edge.toScreenId)
+        const dim = focusSet.size > 0 && !focused
         const kind = edge.broken ? 'broken' : dim ? 'dim' : 'ok'
         return (
-          <g key={edge.id} className={`flow flow-${kind}${focused ? ' flow-focus' : ''}${edge.action === 'overlay' ? ' flow-overlay' : ''}`}>
-            <path d={d} className="flow-line" markerEnd={`url(#arrow-${kind})`} />
-            <circle cx={sx} cy={sy} r={3.5} className="flow-dot" />
-          </g>
+          <path
+            key={edge.id}
+            d={d}
+            className={`flow-line flow-${kind}${focused ? ' flow-focus' : ''}${edge.action === 'overlay' ? ' flow-overlay' : ''}`}
+            markerStart={`url(#flow-dot-${kind})`}
+            markerEnd={`url(#flow-arrow-${kind})`}
+          />
         )
       })}
     </svg>
   )
-}
+})
+
+/** Puntas y puntos de las flechas, con tamaño constante en pantalla. */
+export const FlowMarkers = memo(function FlowMarkers({ zoom }: { zoom: number }) {
+  const size = 9 / zoom
+  return (
+    <svg className="flow-markers" aria-hidden="true">
+      <defs>
+        {['ok', 'broken', 'dim'].map((k) => (
+          <g key={k}>
+            <marker
+              id={`flow-arrow-${k}`}
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth={size}
+              markerHeight={size}
+              markerUnits="userSpaceOnUse"
+              orient="auto-start-reverse"
+            >
+              <path d="M0,0 L10,5 L0,10 z" className={`flow-head flow-head-${k}`} />
+            </marker>
+            <marker
+              id={`flow-dot-${k}`}
+              viewBox="0 0 10 10"
+              refX="5"
+              refY="5"
+              markerWidth={size}
+              markerHeight={size}
+              markerUnits="userSpaceOnUse"
+            >
+              <circle cx="5" cy="5" r="3.6" className={`flow-dot flow-dot-${k}`} />
+            </marker>
+          </g>
+        ))}
+      </defs>
+    </svg>
+  )
+})
 
 /* ---------- Selección, tiradores y guías ---------- */
 
