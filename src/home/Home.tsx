@@ -179,7 +179,9 @@ function ProjectCard({ project, onDelete, onRename }: { project: Project; onDele
     { label: 'Renombrar', icon: 'edit', onSelect: onRename },
     { label: 'Duplicar', icon: 'copy', onSelect: () => duplicateProject(project.id) },
     'separator',
-    { label: 'Descargar .json', icon: 'download', onSelect: () => downloadProject(project) },
+    ...(CAN_DOWNLOAD
+      ? [{ label: 'Descargar .json', icon: 'download', onSelect: () => downloadProject(project) }]
+      : []),
     { label: 'Copiar como JSON', icon: 'copy', onSelect: () => copyProject(project) },
     'separator',
     { label: 'Eliminar', icon: 'trash', danger: true, onSelect: onDelete },
@@ -218,6 +220,9 @@ function ProjectCard({ project, onDelete, onRename }: { project: Project; onDele
     </div>
   )
 }
+
+/** Algunos entornos embebidos bloquean las descargas; ahí solo se ofrece copiar. */
+const CAN_DOWNLOAD = import.meta.env.VITE_NO_DOWNLOAD !== '1'
 
 function exportJson(project: Project) {
   return JSON.stringify({ format: 'pulso', version: 1, project }, null, 2)
