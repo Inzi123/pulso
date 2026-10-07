@@ -1571,6 +1571,11 @@ a:focus-visible {
 .flow-line.flow-overlay {
   stroke-dasharray: 7 4;
 }
+.flow-line.flow-auto {
+  stroke-dasharray: 1.5 5;
+  stroke-linecap: round;
+  stroke-width: 2.5;
+}
 .flow-line.flow-broken {
   stroke: var(--danger);
   stroke-dasharray: 4 4;

@@ -78,6 +78,14 @@ export interface DesignElement {
   overrides: Record<Id, Overrides>
 }
 
+/** Pasa sola a otra pantalla tras un tiempo (cargas, escaneos, animaciones). */
+export interface AutoAdvance {
+  target: Id | null
+  /** Milisegundos desde que se muestra la pantalla. */
+  delay: number
+  transition: Transition
+}
+
 export interface Screen {
   id: Id
   name: string
@@ -89,6 +97,7 @@ export interface Screen {
   /** Modos en los que esta pantalla no existe. */
   excludedModes: Id[]
   elements: DesignElement[]
+  autoAdvance?: AutoAdvance | null
 }
 
 export interface Mode {

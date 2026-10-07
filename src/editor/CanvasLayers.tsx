@@ -240,10 +240,15 @@ export const FlowLayer = memo(function FlowLayer({ project, edges, modeId, focus
         const from = screens.get(edge.fromScreenId)
         const to = screens.get(edge.toScreenId)
         if (!from || !to || from.id === to.id) return []
-        const el = from.elements.find((e) => e.id === edge.fromElementId)
-        if (!el) return []
-        const p = resolveProps(el, modeId)
-        const a = { x: from.x + p.x, y: from.y + p.y, width: p.width, height: p.height }
+        let a: Rect
+        if (edge.fromElementId) {
+          const el = from.elements.find((e) => e.id === edge.fromElementId)
+          if (!el) return []
+          const p = resolveProps(el, modeId)
+          a = { x: from.x + p.x, y: from.y + p.y, width: p.width, height: p.height }
+        } else {
+          a = { x: from.x, y: from.y, width: from.width, height: Math.min(from.height, 200) }
+        }
         const b = { x: to.x, y: to.y, width: to.width, height: to.height }
         return [{ edge, d: flowPath(a, b).d }]
       }),
@@ -260,7 +265,7 @@ export const FlowLayer = memo(function FlowLayer({ project, edges, modeId, focus
           <path
             key={edge.id}
             d={d}
-            className={`flow-line flow-${kind}${focused ? ' flow-focus' : ''}${edge.action === 'overlay' ? ' flow-overlay' : ''}`}
+            className={`flow-line flow-${kind}${focused ? ' flow-focus' : ''}${edge.action === 'overlay' ? ' flow-overlay' : ''}${edge.action === 'auto' ? ' flow-auto' : ''}`}
             markerStart={`url(#flow-dot-${kind})`}
             markerEnd={`url(#flow-arrow-${kind})`}
           />

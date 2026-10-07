@@ -54,6 +54,23 @@ export function Player({ project }: { project: Project }) {
     [nav],
   )
 
+  // Pantallas que avanzan solas (cargas, escaneos…).
+  useEffect(() => {
+    if (nav.overlay || !screen || !available) return
+    const auto = screen.autoAdvance
+    if (!auto?.target) return
+    const t = setTimeout(() => {
+      const next = applyInteraction(
+        nav,
+        { action: 'navigate', target: auto.target, transition: auto.transition, url: '' },
+        project.screens,
+        modeId,
+      )
+      if (next !== nav) go(next, auto.transition)
+    }, Math.max(0, auto.delay))
+    return () => clearTimeout(t)
+  }, [nav, screen, available, project.screens, modeId, go])
+
   const restart = useCallback(() => {
     setAnim((a) => ({ prev: null, transition: 'instant', key: a.key + 1 }))
     setNav(startNav(player.screenId))

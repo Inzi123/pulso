@@ -50,7 +50,11 @@ export function cloneScreens(screens: Screen[]): { screens: Screen[]; idMap: Map
     s.id = next
     for (const el of s.elements) el.id = uid('el')
   }
-  for (const s of copies) for (const el of s.elements) remapElementTargets(el, idMap)
+  for (const s of copies) {
+    for (const el of s.elements) remapElementTargets(el, idMap)
+    const auto = s.autoAdvance
+    if (auto?.target && idMap.has(auto.target)) auto.target = idMap.get(auto.target)!
+  }
   return { screens: copies, idMap }
 }
 

@@ -114,6 +114,16 @@ describe('flujos', () => {
     expect(computeFlows(p, 'premium')[0].toScreenId).toBe(b.id)
   })
 
+  it('incluye el avance automático de una pantalla', () => {
+    const p = projectWithModes()
+    const next = createScreen('Siguiente', 500, 0, 100, 100)
+    next.excludedModes = ['basic']
+    p.screens.push(next)
+    p.screens[0].autoAdvance = { target: next.id, delay: 2000, transition: 'dissolve' }
+    expect(computeFlows(p, 'pro')).toMatchObject([{ action: 'auto', fromElementId: '', toScreenId: next.id, broken: false }])
+    expect(computeFlows(p, 'basic')[0].broken).toBe(true)
+  })
+
   it('ignora elementos ocultos en el modo', () => {
     const p = projectWithModes()
     const a = createScreen('A', 500, 0, 100, 100)
@@ -173,9 +183,11 @@ describe('proyectos', () => {
     const a = createScreen('A', 0, 0, 1, 1)
     const b = createScreen('B', 0, 0, 1, 1)
     a.elements.push(createElement('button', { interaction: nav(b.id) }))
+    b.autoAdvance = { target: a.id, delay: 1000, transition: 'instant' }
     const { screens } = cloneScreens([a, b])
     expect(screens[0].id).not.toBe(a.id)
     expect(screens[0].elements[0].props.interaction?.target).toBe(screens[1].id)
+    expect(screens[1].autoAdvance?.target).toBe(screens[0].id)
   })
 
   it('importa un proyecto exportado y valida el formato', () => {

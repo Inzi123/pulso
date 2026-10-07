@@ -323,6 +323,47 @@ function ScreenInspector({ project, screen, mode }: { project: Project; screen: 
           onChange={(on) => setStartScreen(on ? screen.id : null)}
           label="Pantalla de inicio"
         />
+        <Toggle
+          id={`auto-${screen.id}`}
+          checked={!!screen.autoAdvance}
+          onChange={(on) =>
+            updateScreen(screen.id, {
+              autoAdvance: on ? { target: null, delay: 2500, transition: 'dissolve' } : null,
+            })
+          }
+          label="Avanzar sola tras un tiempo"
+        />
+        {screen.autoAdvance && (
+          <>
+            <div className="row">
+              <Label>Destino</Label>
+              <Select
+                value={screen.autoAdvance.target ?? ''}
+                onChange={(v) => updateScreen(screen.id, { autoAdvance: { ...screen.autoAdvance!, target: v || null } })}
+                options={[
+                  { value: '', label: 'Elige una pantalla…' },
+                  ...project.screens.filter((s) => s.id !== screen.id).map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+            </div>
+            <div className="grid2">
+              <NumberField
+                label="ms"
+                title="Tiempo antes de avanzar"
+                value={screen.autoAdvance.delay}
+                min={0}
+                max={60000}
+                step={100}
+                onChange={(v) => updateScreen(screen.id, { autoAdvance: { ...screen.autoAdvance!, delay: v } }, true, `${key}:delay`)}
+              />
+              <Select
+                value={screen.autoAdvance.transition}
+                onChange={(v) => updateScreen(screen.id, { autoAdvance: { ...screen.autoAdvance!, transition: v } })}
+                options={TRANSITIONS}
+              />
+            </div>
+          </>
+        )}
         <p className="muted small">
           {outgoing} {outgoing === 1 ? 'flujo sale' : 'flujos salen'} de aquí y {incoming} {incoming === 1 ? 'llega' : 'llegan'}
           {project.modes.length > 1 ? ` en ${mode.name}` : ''}.

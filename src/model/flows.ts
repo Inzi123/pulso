@@ -4,9 +4,10 @@ import type { Id, Interaction, InteractionAction, Project, Screen } from './type
 export interface FlowEdge {
   id: string
   fromScreenId: Id
+  /** Vacío cuando el flujo sale de la propia pantalla (avance automático). */
   fromElementId: Id
   toScreenId: Id
-  action: InteractionAction
+  action: InteractionAction | 'auto'
   /** El destino no existe en el modo activo. */
   broken: boolean
 }
@@ -17,6 +18,18 @@ export function computeFlows(project: Project, modeId: Id): FlowEdge[] {
   const edges: FlowEdge[] = []
   for (const screen of project.screens) {
     if (!isScreenAvailable(screen, modeId)) continue
+    const auto = screen.autoAdvance
+    if (auto?.target) {
+      const dest = byId.get(auto.target)
+      edges.push({
+        id: `${screen.id}:auto`,
+        fromScreenId: screen.id,
+        fromElementId: '',
+        toScreenId: auto.target,
+        action: 'auto',
+        broken: !dest || !isScreenAvailable(dest, modeId),
+      })
+    }
     for (const el of screen.elements) {
       const p = resolveProps(el, modeId)
       if (p.hidden || !p.interaction) continue
