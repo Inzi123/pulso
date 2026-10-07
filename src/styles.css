@@ -1170,6 +1170,22 @@ a:focus-visible {
   background: color-mix(in srgb, var(--mode) 13%, var(--panel));
   color: color-mix(in srgb, var(--mode) 70%, var(--fg));
 }
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.swatch-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.swatch-btn.on {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--fg);
+}
 .align-row {
   display: flex;
   justify-content: space-between;
@@ -1338,6 +1354,41 @@ a:focus-visible {
 }
 
 /* ---------- Lienzo ---------- */
+
+.section {
+  position: absolute;
+  border-radius: 36px;
+  background: color-mix(in srgb, var(--sec) 6%, transparent);
+  box-shadow: inset 0 0 0 calc(1.5px * var(--iz, 1)) color-mix(in srgb, var(--sec) 32%, transparent);
+}
+.section.selected {
+  box-shadow: inset 0 0 0 calc(2px * var(--iz, 1)) var(--sec);
+}
+.section-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--sec) 24%, var(--panel));
+  color: color-mix(in srgb, var(--sec) 45%, #ffffff);
+  font: 700 13px var(--font-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+.section-label > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.section-label.selected {
+  box-shadow: 0 0 0 1.5px var(--sec);
+}
+
 
 .canvas {
   position: absolute;

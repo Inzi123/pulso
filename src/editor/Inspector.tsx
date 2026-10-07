@@ -1,8 +1,9 @@
 import { createContext, useContext, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { DEVICE_PRESETS, FONT_FAMILIES, TYPE_LABELS } from '../model/defaults'
+import { DEVICE_PRESETS, FONT_FAMILIES, MODE_COLORS, TYPE_LABELS } from '../model/defaults'
+import { unionRects } from '../model/geometry'
 import { computeFlows } from '../model/flows'
 import { isOverridden, isScreenAvailable, overriddenKeys, PROP_LABELS, resolveProps, setVisibleInMode } from '../model/modes'
-import { findScreen } from '../model/project'
+import { findScreen, screenRect, screensInside } from '../model/project'
 import type {
   DesignElement,
   ElementProps,
@@ -11,6 +12,7 @@ import type {
   Project,
   PropKey,
   Screen,
+  Section as CanvasSection,
   Transition,
 } from '../model/types'
 import { DESIGN_ICONS, Icon } from '../render/icons'
@@ -28,6 +30,7 @@ import {
   toast,
   updateElements,
   updateScreen,
+  updateSection,
   useStore,
   type AlignKind,
 } from '../store/store'
@@ -38,7 +41,10 @@ export function Inspector({ project }: { project: Project }) {
   const mode = project.modes.find((m) => m.id === modeId)!
 
   let body: ReactNode
-  if (selection.kind === 'elements') {
+  if (selection.kind === 'section') {
+    const sec = project.sections?.find((x) => x.id === selection.id)
+    body = sec ? <SectionInspector project={project} section={sec} /> : null
+  } else if (selection.kind === 'elements') {
     const screen = findScreen(project, selection.screenId)
     const els = screen?.elements.filter((e) => selection.ids.includes(e.id)) ?? []
     body = screen && els.length ? <ElementInspector project={project} screen={screen} els={els} mode={mode} /> : null
@@ -231,6 +237,65 @@ function MultiScreens({ count }: { count: number }) {
             <Icon name="trash" size={13} /> Eliminar
           </button>
         </div>
+      </Section>
+    </div>
+  )
+}
+
+/* ---------- Sección ---------- */
+
+function SectionInspector({ project, section }: { project: Project; section: CanvasSection }) {
+  const inside = screensInside(project, section)
+  const key = `section:${section.id}`
+  return (
+    <div className="insp">
+      <div className="insp-title">
+        <Icon name="frame" size={14} />
+        <TextField className="title-input small" value={section.name} onCommit={(v) => v.trim() && updateSection(section.id, { name: v.trim() })} />
+      </div>
+      <Section title="Contenido">
+        <p className="muted small">
+          {inside.length} {inside.length === 1 ? 'pantalla' : 'pantallas'} dentro. Arrastra el título para mover la sección con
+          sus pantallas.
+        </p>
+        {inside.length > 0 && (
+          <button
+            className="link-btn"
+            onClick={() => {
+              const b = unionRects(inside.map(screenRect))!
+              updateSection(section.id, { x: b.x - 80, y: b.y - 130, width: b.width + 160, height: b.height + 210 })
+            }}
+          >
+            Ajustar a sus pantallas
+          </button>
+        )}
+      </Section>
+      <Section title="Color">
+        <div className="swatch-row">
+          {MODE_COLORS.map((c) => (
+            <button
+              key={c}
+              className={`swatch-btn${section.color === c ? ' on' : ''}`}
+              style={{ background: c }}
+              title={c}
+              onClick={() => updateSection(section.id, { color: c })}
+            />
+          ))}
+        </div>
+      </Section>
+      <Section title="Posición y tamaño">
+        <div className="grid2">
+          <NumberField label="X" value={section.x} onChange={(v) => updateSection(section.id, { x: v }, true, `${key}:x`)} />
+          <NumberField label="Y" value={section.y} onChange={(v) => updateSection(section.id, { y: v }, true, `${key}:y`)} />
+          <NumberField label="An" min={100} value={section.width} onChange={(v) => updateSection(section.id, { width: v }, true, `${key}:w`)} />
+          <NumberField label="Al" min={100} value={section.height} onChange={(v) => updateSection(section.id, { height: v }, true, `${key}:h`)} />
+        </div>
+      </Section>
+      <Section title="Acciones">
+        <button className="btn danger" onClick={deleteSelection}>
+          <Icon name="trash" size={13} /> Eliminar sección
+        </button>
+        <p className="muted small">Las pantallas se quedan donde están.</p>
       </Section>
     </div>
   )

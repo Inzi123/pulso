@@ -3,7 +3,7 @@ import type { Camera, Handle, SnapGuide } from '../model/geometry'
 import { worldToScreen } from '../model/geometry'
 import type { FlowEdge } from '../model/flows'
 import { isScreenAvailable, resolveProps, screenChangesInMode } from '../model/modes'
-import type { DesignElement, ElementProps, Id, Mode, Project, Rect, Screen } from '../model/types'
+import type { DesignElement, ElementProps, Id, Mode, Project, Rect, Screen, Section } from '../model/types'
 import { ScreenContent, elementStyle } from '../render/ElementView'
 import { Icon } from '../render/icons'
 import { play, setState, updateElements } from '../store/store'
@@ -102,9 +102,12 @@ interface LabelsProps {
 }
 
 export function ScreenLabels({ project, camera, modeId, mode, selectedIds, renamingId, onRenameDone }: LabelsProps) {
+  // Muy lejos no se leen: solo se muestran las seleccionadas.
+  const tiny = camera.zoom < 0.09
   return (
     <div className="labels-layer">
       {project.screens.map((s) => {
+        if (tiny && !selectedIds.includes(s.id)) return null
         const p = worldToScreen(camera, s.x, s.y)
         const width = s.width * camera.zoom
         const available = isScreenAvailable(s, modeId)
@@ -187,6 +190,46 @@ function RenameInput({ initial, onDone }: { initial: string; onDone: (name: stri
         if (e.key === 'Escape') finish(null)
       }}
     />
+  )
+}
+
+/* ---------- Secciones ---------- */
+
+export function SectionLabels({
+  sections,
+  camera,
+  selectedId,
+  renamingId,
+  onRenameDone,
+}: {
+  sections: Section[]
+  camera: Camera
+  selectedId: Id | null
+  renamingId: Id | null
+  onRenameDone: (id: Id, name: string | null) => void
+}) {
+  if (sections.length === 0) return null
+  return (
+    <div className="labels-layer">
+      {sections.map((sec) => {
+        const p = worldToScreen(camera, sec.x, sec.y)
+        const w = sec.width * camera.zoom
+        return (
+          <div
+            key={sec.id}
+            className={`section-label${selectedId === sec.id ? ' selected' : ''}`}
+            data-section-label={sec.id}
+            style={{ left: p.x, top: p.y - 36, maxWidth: Math.max(80, w), '--sec': sec.color } as CSSProperties}
+          >
+            {renamingId === sec.id ? (
+              <RenameInput initial={sec.name} onDone={(name) => onRenameDone(sec.id, name)} />
+            ) : (
+              <span>{sec.name}</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

@@ -15,6 +15,8 @@ Editor visual tipo Figma para diseñar **apps y webs**, ver sus **flujos** en un
   muestran cómo se conecta todo; las de trazo discontinuo abren un modal, las punteadas son pantallas
   que avanzan solas tras un tiempo (cargas, escaneos) y las rojas apuntan a una pantalla que no
   existe en el modo activo.
+- **Secciones**: agrupa pantallas en zonas con título (clic derecho → «Crear sección con la
+  selección»). Arrastrando el título se mueve la sección con sus pantallas.
 - **Probar (play)**: pulsa ▶ junto al nombre de cualquier pantalla, «Probar aquí» en el panel o
   `Ctrl`/`⌘` + `Intro`. El prototipo se muestra en un marco de móvil o de navegador, con
   transiciones, modales, scroll y elementos fijos. Puedes cambiar de modo sin salir.

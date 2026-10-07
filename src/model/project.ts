@@ -23,6 +23,13 @@ export function screenRect(s: Screen): Rect {
   return { x: s.x, y: s.y, width: s.width, height: s.height }
 }
 
+/** Pantallas que quedan enteras dentro de una zona. */
+export function screensInside(project: Project, r: Rect): Screen[] {
+  return project.screens.filter(
+    (s) => s.x >= r.x && s.y >= r.y && s.x + s.width <= r.x + r.width && s.y + s.height <= r.y + r.height,
+  )
+}
+
 /** Rectángulo de un elemento en coordenadas del mundo, en un modo. */
 export function elementWorldRect(screen: Screen, el: DesignElement, modeId: Id): Rect {
   const p = resolveProps(el, modeId)
@@ -118,5 +125,6 @@ export function parseProject(raw: unknown): Project {
   project.viewportHeight ??= project.kind === 'app' ? 852 : 1024
   project.name = typeof project.name === 'string' && project.name ? project.name : 'Importado'
   project.startScreenId ??= project.screens[0]?.id ?? null
+  project.sections = Array.isArray(project.sections) ? project.sections : []
   return cloneProject(project)
 }

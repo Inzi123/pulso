@@ -25,6 +25,9 @@ import {
   DRAW_TOOLS,
   NO_SELECTION,
   addElement,
+  addSectionAround,
+  moveSection,
+  updateSection,
   addScreen,
   beginGesture,
   copySelection,
@@ -53,6 +56,7 @@ import {
   FlowLayer,
   FlowMarkers,
   Guides,
+  SectionLabels,
   HoverOutline,
   ScreenLabels,
   ScreenView,
@@ -91,9 +95,10 @@ type Drag =
       clickedId: Id
       wasSelected: boolean
     }
+  | { type: 'move-section'; id: Id; start: { x: number; y: number }; moved: { x: number; y: number } }
   | {
       type: 'resize'
-      target: { kind: 'screen'; id: Id } | { kind: 'element'; screenId: Id; id: Id }
+      target: { kind: 'screen'; id: Id } | { kind: 'element'; screenId: Id; id: Id } | { kind: 'section'; id: Id }
       handle: Handle
       start: { x: number; y: number }
       rect: Rect
@@ -277,6 +282,14 @@ export function Canvas() {
       return
     }
 
+    const sectionId = target.closest<HTMLElement>('[data-section-label]')?.dataset.sectionLabel
+    if (sectionId) {
+      select({ kind: 'section', id: sectionId })
+      beginGesture()
+      drag.current = { type: 'move-section', id: sectionId, start: world, moved: { x: 0, y: 0 } }
+      return
+    }
+
     const labelId = target.closest<HTMLElement>('[data-screen-label]')?.dataset.screenLabel
     const elId = target.closest<HTMLElement>('[data-el]')?.dataset.el
     const screenId = target.closest<HTMLElement>('[data-screen]')?.dataset.screen
@@ -312,7 +325,19 @@ export function Canvas() {
     const p = currentProjectFresh()
     const sel = state.selection
     beginGesture()
-    if (sel.kind === 'screens' && sel.ids.length === 1) {
+    if (sel.kind === 'section') {
+      const sec = p.sections?.find((x) => x.id === sel.id)
+      if (!sec) return
+      drag.current = {
+        type: 'resize',
+        target: { kind: 'section', id: sec.id },
+        handle,
+        start: world,
+        rect: { x: sec.x, y: sec.y, width: sec.width, height: sec.height },
+        xs: p.screens.flatMap((o) => [o.x - 80, o.x + o.width + 80]),
+        ys: p.screens.flatMap((o) => [o.y - 130, o.y + o.height + 80]),
+      }
+    } else if (sel.kind === 'screens' && sel.ids.length === 1) {
       const s = findScreen(p, sel.ids[0])!
       const others = p.screens.filter((x) => x.id !== s.id)
       drag.current = {
@@ -515,6 +540,14 @@ export function Canvas() {
         break
       }
 
+      case 'move-section': {
+        const dx = Math.round(world.x - d.start.x)
+        const dy = Math.round(world.y - d.start.y)
+        moveSection(d.id, dx - d.moved.x, dy - d.moved.y, false)
+        d.moved = { x: dx, y: dy }
+        break
+      }
+
       case 'resize': {
         const dx = world.x - d.start.x
         const dy = world.y - d.start.y
@@ -557,6 +590,8 @@ export function Canvas() {
         r = roundRect(r)
         if (d.target.kind === 'element') {
           updateElements(d.target.screenId, [d.target.id], { x: r.x, y: r.y, width: r.width, height: r.height }, false)
+        } else if (d.target.kind === 'section') {
+          updateSection(d.target.id, r, false)
         } else {
           updateScreen(d.target.id, r, false)
         }
@@ -614,6 +649,7 @@ export function Canvas() {
         endGesture()
         break
       case 'resize':
+      case 'move-section':
         endGesture()
         break
       case 'draw': {
@@ -670,7 +706,7 @@ export function Canvas() {
   function cancelDrag() {
     const d = drag.current
     drag.current = null
-    if (d && (d.type === 'move-elements' || d.type === 'move-screens' || d.type === 'resize')) endGesture()
+    if (d && (d.type === 'move-elements' || d.type === 'move-screens' || d.type === 'resize' || d.type === 'move-section')) endGesture()
     setOverlay({})
     setLiftedScreenId(null)
     setPanning(false)
@@ -693,8 +729,14 @@ export function Canvas() {
   }
 
   const onDoubleClick = (e: React.MouseEvent) => {
-    const t = e.target as HTMLElement
+    // Con el puntero capturado, el evento llega al lienzo: se busca lo que hay debajo.
+    const t = (document.elementFromPoint(e.clientX, e.clientY) ?? e.target) as HTMLElement
     if (t.closest('[data-editing]')) return
+    const sectionLabel = t.closest<HTMLElement>('[data-section-label]')?.dataset.sectionLabel
+    if (sectionLabel) {
+      setRenamingId(sectionLabel)
+      return
+    }
     const labelId = t.closest<HTMLElement>('[data-screen-label]')?.dataset.screenLabel
     if (labelId) {
       setRenamingId(labelId)
@@ -718,6 +760,19 @@ export function Canvas() {
       t.closest<HTMLElement>('[data-screen]')?.dataset.screen ??
       t.closest<HTMLElement>('[data-screen-label]')?.dataset.screenLabel
     const sel = getState().selection
+    const sectionLabel = t.closest<HTMLElement>('[data-section-label]')?.dataset.sectionLabel
+    if (sectionLabel) {
+      select({ kind: 'section', id: sectionLabel })
+      setMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+          { label: 'Renombrar', icon: 'edit', onSelect: () => setRenamingId(sectionLabel) },
+          { label: 'Eliminar sección', icon: 'trash', danger: true, onSelect: deleteSelection },
+        ],
+      })
+      return
+    }
     if (elId && screenId) {
       if (!(sel.kind === 'elements' && sel.ids.includes(elId))) select({ kind: 'elements', screenId, ids: [elId] })
     } else if (screenId) {
@@ -739,7 +794,13 @@ export function Canvas() {
   let selRects: Rect[] = []
   let hiddenSelected = false
   let sizeLabel: string | null = null
-  if (selection.kind === 'screens') {
+  if (selection.kind === 'section') {
+    const sec = project.sections?.find((x) => x.id === selection.id)
+    if (sec) {
+      selRects = [{ x: sec.x, y: sec.y, width: sec.width, height: sec.height }]
+      sizeLabel = `${sec.width} × ${sec.height}`
+    }
+  } else if (selection.kind === 'screens') {
     const ss = project.screens.filter((s) => selection.ids.includes(s.id))
     selRects = ss.map(screenRect)
     if (ss.length === 1) sizeLabel = `${ss[0].width} × ${ss[0].height}`
@@ -802,6 +863,13 @@ export function Canvas() {
           } as CSSProperties
         }
       >
+        {project.sections?.map((sec) => (
+          <div
+            key={sec.id}
+            className={`section${selection.kind === 'section' && selection.id === sec.id ? ' selected' : ''}`}
+            style={{ left: sec.x, top: sec.y, width: sec.width, height: sec.height, '--sec': sec.color } as CSSProperties}
+          />
+        ))}
         {project.screens.map((s) => (
           <ScreenView
             key={s.id}
@@ -824,6 +892,16 @@ export function Canvas() {
 
       {showFlows && <FlowMarkers zoom={camera.zoom} />}
 
+      <SectionLabels
+        sections={project.sections ?? []}
+        camera={camera}
+        selectedId={selection.kind === 'section' ? selection.id : null}
+        renamingId={renamingId}
+        onRenameDone={(id, name) => {
+          setRenamingId(null)
+          if (name && name.trim()) updateSection(id, { name: name.trim() })
+        }}
+      />
       <ScreenLabels
         project={project}
         camera={camera}
@@ -970,6 +1048,7 @@ function contextItems(screenId: Id | null): MenuEntry[] {
     items.push({ label: 'Probar desde aquí', icon: 'play', shortcut: `${MOD}↵`, onSelect: () => play(screenId) })
     if (sel.kind === 'screens') {
       items.push(
+        { label: 'Crear sección con la selección', icon: 'frame', onSelect: () => addSectionAround(sel.ids) },
         { label: 'Usar como pantalla de inicio', icon: 'flows', onSelect: () => setStartScreen(screenId) },
         { label: 'Comparar modos', icon: 'compare', onSelect: () => setState({ compareScreenId: screenId }) },
       )

@@ -106,6 +106,17 @@ export interface Mode {
   color: string
 }
 
+/** Zona con título que agrupa pantallas en el lienzo, como las secciones de Figma. */
+export interface Section {
+  id: Id
+  name: string
+  x: number
+  y: number
+  width: number
+  height: number
+  color: string
+}
+
 export interface Project {
   id: Id
   name: string
@@ -114,6 +125,7 @@ export interface Project {
   viewportHeight: number
   modes: Mode[]
   screens: Screen[]
+  sections?: Section[]
   startScreenId: Id | null
   createdAt: number
   updatedAt: number

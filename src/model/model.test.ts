@@ -3,7 +3,7 @@ import { createElement, createProject, createScreen } from './defaults'
 import { applyInteraction, computeFlows, startNav } from './flows'
 import { resizeRect, snapRect } from './geometry'
 import { copyModeOverrides, removeModeFromProject, resolveProps, setVisibleInMode, writeProps } from './modes'
-import { cloneScreens, parseProject } from './project'
+import { cloneScreens, parseProject, screensInside } from './project'
 import { TEMPLATES } from './templates'
 import type { Interaction, Project } from './types'
 
@@ -188,6 +188,13 @@ describe('proyectos', () => {
     expect(screens[0].id).not.toBe(a.id)
     expect(screens[0].elements[0].props.interaction?.target).toBe(screens[1].id)
     expect(screens[1].autoAdvance?.target).toBe(screens[0].id)
+  })
+
+  it('sabe qué pantallas quedan dentro de una sección', () => {
+    const p = projectWithModes()
+    p.screens.push(createScreen('Fuera', 2000, 0, 100, 100))
+    const inside = screensInside(p, { x: -50, y: -50, width: 600, height: 1000 })
+    expect(inside.map((s) => s.name)).toEqual(['Inicio'])
   })
 
   it('importa un proyecto exportado y valida el formato', () => {

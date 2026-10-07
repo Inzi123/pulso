@@ -1,11 +1,13 @@
 import { produce, type Draft } from 'immer'
 import { create } from 'zustand'
 import {
+  MODE_COLORS,
   createElement,
   createMode,
   createProject,
   createScreen,
   defaultDevice,
+  uid,
 } from '../model/defaults'
 import {
   fitCamera,
@@ -30,6 +32,7 @@ import {
   findScreen,
   nextScreenPosition,
   screenRect,
+  screensInside,
 } from '../model/project'
 import type {
   DesignElement,
@@ -41,6 +44,7 @@ import type {
   PropKey,
   Rect,
   Screen,
+  Section,
 } from '../model/types'
 import { TEMPLATES } from '../model/templates'
 
@@ -70,6 +74,7 @@ export type Selection =
   | { kind: 'none' }
   | { kind: 'screens'; ids: Id[] }
   | { kind: 'elements'; screenId: Id; ids: Id[] }
+  | { kind: 'section'; id: Id }
 
 export const NO_SELECTION: Selection = { kind: 'none' }
 
@@ -259,7 +264,9 @@ function sanitizeSelection() {
   const project = currentProject()
   const sel = get().selection
   if (!project || sel.kind === 'none') return
-  if (sel.kind === 'screens') {
+  if (sel.kind === 'section') {
+    if (!project.sections?.some((x) => x.id === sel.id)) set({ selection: NO_SELECTION })
+  } else if (sel.kind === 'screens') {
     const ids = sel.ids.filter((id) => findScreen(project, id))
     set({ selection: ids.length ? { kind: 'screens', ids } : NO_SELECTION })
   } else {
@@ -541,7 +548,11 @@ export function addElement(screenId: Id, type: ElementType, props: Partial<Eleme
 
 export function deleteSelection() {
   const sel = get().selection
-  if (sel.kind === 'screens') {
+  if (sel.kind === 'section') {
+    mutate((d) => {
+      d.sections = (d.sections ?? []).filter((x) => x.id !== sel.id)
+    })
+  } else if (sel.kind === 'screens') {
     mutate((d) => {
       d.screens = d.screens.filter((s) => !sel.ids.includes(s.id))
       if (d.startScreenId && sel.ids.includes(d.startScreenId)) d.startScreenId = d.screens[0]?.id ?? null
@@ -691,7 +702,9 @@ function reorder<T extends { id: Id }>(list: T[], ids: Id[], where: 'front' | 'b
 
 export function nudgeSelection(dx: number, dy: number) {
   const sel = get().selection
-  if (sel.kind === 'elements') {
+  if (sel.kind === 'section') {
+    moveSection(sel.id, dx, dy)
+  } else if (sel.kind === 'elements') {
     updateElements(sel.screenId, sel.ids, (p) => ({ x: p.x + dx, y: p.y + dy }))
   } else if (sel.kind === 'screens') {
     mutate((d) => {
@@ -769,6 +782,57 @@ export function moveElementsToScreen(fromId: Id, ids: Id[], toId: Id) {
   set({ selection: { kind: 'elements', screenId: toId, ids } })
 }
 
+/* ---------- Secciones ---------- */
+
+export function addSectionAround(ids: Id[]) {
+  const project = currentProject()
+  if (!project) return null
+  const rects = project.screens.filter((s) => ids.includes(s.id)).map(screenRect)
+  const b = unionRects(rects)
+  if (!b) return null
+  const n = (project.sections?.length ?? 0) + 1
+  const section: Section = {
+    id: uid('sec'),
+    name: `Sección ${n}`,
+    x: Math.round(b.x - 80),
+    y: Math.round(b.y - 130),
+    width: Math.round(b.width + 160),
+    height: Math.round(b.height + 210),
+    color: MODE_COLORS[(n - 1) % MODE_COLORS.length],
+  }
+  mutate((d) => {
+    ;(d.sections ??= []).push(section)
+  })
+  select({ kind: 'section', id: section.id })
+  return section.id
+}
+
+export function updateSection(id: Id, patch: Partial<Omit<Section, 'id'>>, record = true, coalesceKey?: string) {
+  mutate((d) => {
+    const s = d.sections?.find((x) => x.id === id)
+    if (s) Object.assign(s, patch)
+  }, record, coalesceKey)
+}
+
+/** Mueve una sección junto con las pantallas que contiene. */
+export function moveSection(id: Id, dx: number, dy: number, record = true) {
+  const project = currentProject()
+  const sec = project?.sections?.find((x) => x.id === id)
+  if (!project || !sec) return
+  const inside = new Set(screensInside(project, sec).map((s) => s.id))
+  mutate((d) => {
+    const s = d.sections?.find((x) => x.id === id)
+    if (!s) return
+    s.x += dx
+    s.y += dy
+    for (const sc of d.screens) {
+      if (!inside.has(sc.id)) continue
+      sc.x += dx
+      sc.y += dy
+    }
+  }, record)
+}
+
 /* ---------- Cámara ---------- */
 
 export function setCamera(camera: Camera) {
@@ -801,6 +865,7 @@ export function selectionBounds(): Rect | null {
   const project = currentProject()
   const { selection: sel, modeId } = get()
   if (!project) return null
+  if (sel.kind === 'section') return project.sections?.find((x) => x.id === sel.id) ?? null
   if (sel.kind === 'screens') {
     return unionRects(project.screens.filter((s) => sel.ids.includes(s.id)).map(screenRect))
   }
