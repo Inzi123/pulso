@@ -2,6 +2,9 @@ export type Id = string
 
 export type ProjectKind = 'app' | 'web'
 
+/** Cómo se enmarca el prototipo al probarlo. «auto» sigue el tipo de proyecto. */
+export type DeviceFrame = 'auto' | 'phone' | 'browser' | 'none'
+
 export type ElementType =
   | 'rect'
   | 'ellipse'
@@ -123,6 +126,7 @@ export interface Project {
   kind: ProjectKind
   /** Alto del viewport en el prototipo (las pantallas más altas hacen scroll). */
   viewportHeight: number
+  frame?: DeviceFrame
   modes: Mode[]
   screens: Screen[]
   sections?: Section[]

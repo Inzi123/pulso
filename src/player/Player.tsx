@@ -140,12 +140,14 @@ export function Player({ project }: { project: Project }) {
     flashTimer.current = setTimeout(() => setFlash(false), 650)
   }
 
-  const isApp = project.kind === 'app'
+  const frame = !project.frame || project.frame === 'auto' ? (project.kind === 'app' ? 'phone' : 'browser') : project.frame
+  const isApp = frame === 'phone'
+  const isWeb = frame === 'browser'
   const base = screen ?? project.screens[0]
   const vw = base?.width ?? 393
   const vh = Math.min(base?.height ?? 852, project.viewportHeight || base?.height || 852)
   const bezel = isApp ? 12 : 0
-  const chrome = isApp ? 0 : 40
+  const chrome = isWeb ? 40 : 0
   const frameW = vw + bezel * 2
   const frameH = vh + bezel * 2 + chrome
   const scale = Math.min(1, (stage.w - 32) / frameW, (stage.h - 32) / frameH)
@@ -220,10 +222,10 @@ export function Player({ project }: { project: Project }) {
 
       <div className="player-stage" ref={stageRef}>
         <div
-          className={`device ${isApp ? 'device-app' : 'device-web'}`}
+          className={`device device-${frame}`}
           style={{ width: frameW, height: frameH, transform: `translate(-50%, -50%) scale(${scale})` }}
         >
-          {!isApp && (
+          {isWeb && (
             <div className="browser-bar">
               <span className="dots">
                 <i />
@@ -237,7 +239,7 @@ export function Player({ project }: { project: Project }) {
           )}
           <div
             className={`pl-viewport${flash || hotspots ? ' show-hotspots' : ''}`}
-            style={{ width: vw, height: vh, borderRadius: isApp ? 42 : 0 }}
+            style={{ width: vw, height: vh, borderRadius: isApp ? 42 : frame === 'none' ? 14 : 0 }}
           >
             {screen && available ? (
               <>

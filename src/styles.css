@@ -1933,16 +1933,20 @@ a:focus-visible {
   top: 50%;
   transform-origin: center;
 }
-.device-app {
+.device-phone {
   background: #050506;
   border-radius: 54px;
   padding: 12px;
   box-shadow: 0 0 0 1.5px #2c2d33, 0 30px 90px rgba(0, 0, 0, 0.6);
 }
-.device-web {
+.device-browser {
   background: #fff;
   border-radius: 10px;
   overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 30px 90px rgba(0, 0, 0, 0.6);
+}
+.device-none {
+  border-radius: 14px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 30px 90px rgba(0, 0, 0, 0.6);
 }
 .browser-bar {

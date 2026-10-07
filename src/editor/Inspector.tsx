@@ -187,6 +187,19 @@ function ProjectInspector({ project, mode }: { project: Project; mode: Mode }) {
             ]}
           />
         </div>
+        <div className="row">
+          <Label>Marco</Label>
+          <Select
+            value={project.frame ?? 'auto'}
+            onChange={(v) => mutate((d) => void (d.frame = v))}
+            options={[
+              { value: 'auto', label: 'Según el tipo' },
+              { value: 'phone', label: 'Móvil' },
+              { value: 'browser', label: 'Navegador' },
+              { value: 'none', label: 'Sin marco (tótem, tablet)' },
+            ]}
+          />
+        </div>
         <div className="grid2">
           <NumberField
             label="Alto"
