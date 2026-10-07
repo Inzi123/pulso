@@ -1,5 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react'
 import { MODE_COLORS } from '../model/defaults'
+import { HiloMark } from '../ui/Brand'
 import type { Project } from '../model/types'
 import { Icon } from '../render/icons'
 import { Menu, MOD, Select, TextField, type MenuEntry } from '../ui/controls'
@@ -52,7 +53,7 @@ export function TopBar({ project }: { project: Project }) {
     <header className="topbar">
       <div className="topbar-left">
         <button className="brand-btn" onClick={closeProject} title="Volver a tus proyectos">
-          <PulseMark />
+          <HiloMark />
         </button>
         <button
           className={`icon-btn panel-toggle${panels.left ? ' on' : ''}`}
@@ -151,22 +152,6 @@ export function TopBar({ project }: { project: Project }) {
         {zoomMenu && <Menu x={zoomMenu.x} y={zoomMenu.y} items={zoomItems} onClose={() => setZoomMenu(null)} />}
       </div>
     </header>
-  )
-}
-
-export function PulseMark({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-label="Pulso" role="img">
-      <rect width="32" height="32" rx="9" className="mark-bg" />
-      <path
-        d="M5 17h5l3-7 5 13 3-6h6"
-        fill="none"
-        className="mark-line"
-        strokeWidth="2.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   )
 }
 

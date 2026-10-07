@@ -1,4 +1,4 @@
-# Pulso
+# Hilo
 
 Editor visual tipo Figma para diseñar **apps y webs**, ver sus **flujos** en un lienzo infinito,
 **probar** cualquier pantalla como prototipo y comparar cómo cambia el producto en distintos
@@ -23,6 +23,9 @@ Editor visual tipo Figma para diseñar **apps y webs**, ver sus **flujos** en un
   activo; los campos que cambian en ese modo se marcan con su color y se pueden restablecer.
   «Comparar modos» (`C`) muestra una pantalla en todos los modos lado a lado.
 - **Guardado automático** en el navegador, exportación e importación en JSON.
+- **Plantillas publicadas aparte**: si junto a la app hay un `templates/index.json`, sus proyectos
+  aparecen en «Plantillas». Sirve para ofrecer proyectos grandes con imágenes (por ejemplo, flujos
+  capturados de otra app) sin incluirlos en el código.
 
 El proyecto de ejemplo **Sereno · Terapia online** muestra los tres planes: en Esencial el chat abre
 un modal para mejorar el plan, en Plus lleva al chat y en Premium además aparecen la videollamada y

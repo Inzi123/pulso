@@ -16,14 +16,14 @@ export function uid(prefix = 'id'): string {
 }
 
 export const MODE_COLORS = [
-  '#0f9d8a',
-  '#e08a00',
-  '#7b4dff',
-  '#e0466b',
-  '#1f7ae0',
-  '#5b8c00',
-  '#c2410c',
-  '#0891b2',
+  '#f08a3c',
+  '#9b6cf2',
+  '#e5487f',
+  '#e9b23a',
+  '#4c8dff',
+  '#8cc152',
+  '#e5484d',
+  '#2bb5a6',
 ]
 
 export const FONT_FAMILIES: { value: string; label: string }[] = [

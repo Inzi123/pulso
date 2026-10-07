@@ -114,11 +114,13 @@ interface State {
 
 /* ---------- Persistencia ---------- */
 
-const STORAGE_KEY = 'pulso:v1'
+const STORAGE_KEY = 'hilo:v1'
+/** Clave usada antes de que la app se llamara Hilo. */
+const LEGACY_KEY = 'pulso:v1'
 
 function loadSaved(): { projects: Record<Id, Project>; order: Id[] } | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY)
     if (!raw) return null
     const data = JSON.parse(raw) as { projects: Project[]; order: Id[] }
     const projects: Record<Id, Project> = {}

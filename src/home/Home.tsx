@@ -1,12 +1,12 @@
-import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createMode } from '../model/defaults'
 import { parseProject } from '../model/project'
 import { TEMPLATES } from '../model/templates'
 import type { Project, ProjectKind } from '../model/types'
 import { ScreenThumb } from '../render/ElementView'
 import { Icon } from '../render/icons'
+import { HiloMark } from '../ui/Brand'
 import { Dialog, Menu, Segmented, type MenuEntry } from '../ui/controls'
-import { PulseMark } from '../editor/TopBar'
 import {
   addProject,
   deleteProject,
@@ -30,111 +30,239 @@ function ago(t: number) {
   return rtf.format(Math.round(h / 24), 'day')
 }
 
+/**
+ * Plantillas publicadas junto a la app (templates/index.json). Permiten
+ * ofrecer proyectos grandes, con imágenes, sin meterlos en el código.
+ */
+interface RemoteTemplate {
+  id: string
+  name: string
+  description: string
+  kind: ProjectKind
+  project: string
+  cover?: string
+  screens?: number
+  modes?: { name: string; color: string }[]
+}
+
+function useRemoteTemplates() {
+  const [list, setList] = useState<RemoteTemplate[]>([])
+  useEffect(() => {
+    let alive = true
+    fetch('templates/index.json')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { templates?: RemoteTemplate[] } | null) => {
+        if (alive && d && Array.isArray(d.templates)) setList(d.templates)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+  return list
+}
+
+async function openRemoteTemplate(t: RemoteTemplate) {
+  try {
+    const res = await fetch(t.project)
+    if (!res.ok) throw new Error(String(res.status))
+    const project = parseProject(await res.json())
+    project.name = t.name
+    const id = addProject(project)
+    openProject(id)
+  } catch {
+    toast('No se pudo cargar la plantilla. Vuelve a intentarlo.', 'error')
+  }
+}
+
+type Filter = 'all' | 'app' | 'web' | 'modes'
+type Section = 'projects' | 'templates'
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'app', label: 'Apps' },
+  { value: 'web', label: 'Webs' },
+  { value: 'modes', label: 'Con modos' },
+]
+
 export function Home() {
   const projects = useStore((s) => s.projects)
   const order = useStore((s) => s.order)
+  const remote = useRemoteTemplates()
+  const [section, setSection] = useState<Section>('projects')
+  const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [filter, setFilter] = useState<Filter>('all')
+  const [query, setQuery] = useState('')
+  const [sideOpen, setSideOpen] = useState(false)
   const [creating, setCreating] = useState<ProjectKind | null>(null)
   const [importing, setImporting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null)
   const [renaming, setRenaming] = useState<Project | null>(null)
-  const templatePreviews = useMemo(() => TEMPLATES.map((t) => ({ t, p: t.build() })), [])
+
+  const list = order
+    .map((id) => projects[id])
+    .filter((p): p is Project => !!p)
+    .filter((p) => (filter === 'all' ? true : filter === 'modes' ? p.modes.length > 1 : p.kind === filter))
+    .filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
+
+  const go = (s: Section) => {
+    setSection(s)
+    setSideOpen(false)
+  }
 
   return (
     <div className="home">
-      <header className="home-head">
-        <div className="brand">
-          <PulseMark size={30} />
-          <span className="brand-name">Pulso</span>
+      <aside className={`side${sideOpen ? ' open' : ''}`} aria-label="Navegación">
+        <div className="side-brand">
+          <HiloMark size={26} />
+          <span className="brand-name">Hilo</span>
         </div>
-        <button className="btn" onClick={() => setImporting(true)}>
-          <Icon name="upload" size={14} /> Importar
+        <nav className="side-nav">
+          <button className={`side-item${section === 'projects' ? ' on' : ''}`} onClick={() => go('projects')}>
+            <Icon name="layers" size={16} />
+            <span>Todos los proyectos</span>
+            <span className="side-count">{order.length}</span>
+          </button>
+          <button className={`side-item${section === 'templates' ? ' on' : ''}`} onClick={() => go('templates')}>
+            <Icon name="grid" size={16} />
+            <span>Plantillas</span>
+            <span className="side-count">{TEMPLATES.length + remote.length}</span>
+          </button>
+        </nav>
+        <div className="side-label">Recientes</div>
+        <ul className="side-projects">
+          {order.slice(0, 8).map((id) => {
+            const p = projects[id]
+            if (!p) return null
+            return (
+              <li key={id}>
+                <button className="side-item" onClick={() => openProject(id)} title={p.name}>
+                  <span className="side-letter">{p.name.trim().charAt(0).toUpperCase() || '?'}</span>
+                  <span className="side-name">{p.name}</span>
+                  <Icon name="chevron-right" size={14} className="side-chev" />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        <button className="side-item muted" onClick={() => setCreating('app')}>
+          <Icon name="plus" size={16} />
+          <span>Nuevo proyecto</span>
         </button>
-      </header>
+        <div className="side-spacer" />
+        <div className="side-foot">
+          <button className="side-item muted" onClick={() => setImporting(true)}>
+            <Icon name="upload" size={16} />
+            <span>Importar</span>
+          </button>
+        </div>
+      </aside>
+      {sideOpen && <div className="side-scrim" onClick={() => setSideOpen(false)} />}
 
       <main className="home-main">
-        <section className="home-hero">
-          <h1>Diseña apps y webs, conecta sus flujos y pruébalas en cada modo.</h1>
-          <p className="lead">
-            Un lienzo infinito para tus pantallas. Dibuja, une cada botón con su destino y pulsa ▶ en cualquier pantalla
-            para probarla. Con los modos ves cómo cambia el producto según el plan, el rol o lo que necesites.
-          </p>
-          <div className="new-row">
-            <button className="new-card" onClick={() => setCreating('app')}>
-              <span className="new-icon">
-                <Icon name="smartphone" size={22} />
-              </span>
-              <span>
-                <b>Nueva app</b>
-                <small>Pantallas de 393 × 852</small>
-              </span>
-            </button>
-            <button className="new-card" onClick={() => setCreating('web')}>
-              <span className="new-icon">
-                <Icon name="globe" size={22} />
-              </span>
-              <span>
-                <b>Nueva web</b>
-                <small>Pantallas de 1440 × 1024</small>
-              </span>
-            </button>
-          </div>
-        </section>
-
-        <section className="home-section">
-          <h2>Empieza con un ejemplo</h2>
-          <div className="tpl-grid">
-            {templatePreviews.map(({ t, p }) => {
-              return (
-                <button
-                  key={t.id}
-                  className="tpl-card"
-                  onClick={() => {
-                    const id = newFromTemplate(t.id)
-                    if (id) openProject(id)
-                  }}
-                >
-                  <div className="tpl-thumb">
-                    {p.screens.slice(0, t.kind === 'app' ? 3 : 1).map((s) => (
-                      <ScreenThumb key={s.id} screen={s} modeId={p.modes[p.modes.length - 1].id} width={t.kind === 'app' ? 74 : 230} height={150} />
-                    ))}
-                  </div>
-                  <div className="tpl-body">
-                    <b>{t.name}</b>
-                    <span className="tpl-desc">{t.description}</span>
-                    <span className="tpl-modes">
-                      {p.modes.map((m) => (
-                        <span key={m.id} className="mode-pill" style={{ '--mode': m.color } as CSSProperties}>
-                          {m.name}
-                        </span>
-                      ))}
-                    </span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-
-        <section className="home-section">
-          <h2>
-            Tus proyectos <span className="count">{order.length}</span>
-          </h2>
-          {order.length === 0 ? (
-            <p className="muted">Todavía no tienes proyectos. Crea una app o una web, o empieza con un ejemplo.</p>
-          ) : (
-            <div className="project-grid">
-              {order.map((id) => projects[id] && (
-                <ProjectCard
-                  key={id}
-                  project={projects[id]}
-                  onDelete={() => setConfirmDelete(projects[id])}
-                  onRename={() => setRenaming(projects[id])}
-                />
-              ))}
+        <header className="home-top">
+          <button className="icon-btn side-toggle" onClick={() => setSideOpen(true)} aria-label="Abrir navegación">
+            <Icon name="menu" size={18} />
+          </button>
+          <h1 className="home-title">{section === 'projects' ? 'Proyectos' : 'Plantillas'}</h1>
+          {section === 'projects' && (
+            <div className="view-tabs" role="tablist" aria-label="Vista">
+              <button role="tab" aria-selected={view === 'grid'} className={view === 'grid' ? 'on' : ''} onClick={() => setView('grid')}>
+                Cuadrícula
+              </button>
+              <button role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>
+                Lista
+              </button>
             </div>
           )}
-        </section>
+        </header>
+        <p className="home-sub">
+          {section === 'projects'
+            ? 'Diseña apps y webs, conecta sus flujos y pruébalos en cada modo.'
+            : 'Empieza desde un proyecto de ejemplo con sus pantallas, flujos y modos.'}
+        </p>
+
+        {section === 'projects' ? (
+          <>
+            <div className="chip-row">
+              <label className="search-chip">
+                <Icon name="search" size={14} />
+                <input
+                  id="project-search"
+                  placeholder="Buscar proyectos…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </label>
+              {FILTERS.map((f) => (
+                <button
+                  key={f.value}
+                  className={`chip${filter === f.value ? ' on' : ''}`}
+                  onClick={() => setFilter(f.value)}
+                  aria-pressed={filter === f.value}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {list.length === 0 ? (
+              <div className="empty">
+                <p>{order.length === 0 ? 'Todavía no tienes proyectos.' : 'Ningún proyecto coincide con la búsqueda.'}</p>
+                <div className="btn-row">
+                  <button className="btn primary" onClick={() => setCreating('app')}>
+                    <Icon name="plus" size={14} /> Nueva app
+                  </button>
+                  <button className="btn" onClick={() => setCreating('web')}>
+                    <Icon name="globe" size={14} /> Nueva web
+                  </button>
+                </div>
+              </div>
+            ) : view === 'grid' ? (
+              <div className="project-grid">
+                {list.map((p) => (
+                  <ProjectCard key={p.id} project={p} onDelete={() => setConfirmDelete(p)} onRename={() => setRenaming(p)} />
+                ))}
+              </div>
+            ) : (
+              <div className="project-list" role="table">
+                <div className="pl-row pl-head" role="row">
+                  <span role="columnheader">Nombre</span>
+                  <span role="columnheader">Tipo</span>
+                  <span role="columnheader">Pantallas</span>
+                  <span role="columnheader">Modos</span>
+                  <span role="columnheader">Editado</span>
+                </div>
+                {list.map((p) => (
+                  <button key={p.id} className="pl-row" role="row" onClick={() => openProject(p.id)}>
+                    <span className="pl-name" role="cell">
+                      <span className="side-letter">{p.name.trim().charAt(0).toUpperCase()}</span>
+                      {p.name}
+                    </span>
+                    <span role="cell">{p.kind === 'app' ? 'App' : 'Web'}</span>
+                    <span role="cell" className="num">{p.screens.length}</span>
+                    <span role="cell">
+                      <ModeDots modes={p.modes} />
+                    </span>
+                    <span role="cell" className="muted">{ago(p.updatedAt)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <section className="home-section">
+              <h2>Empieza con un ejemplo</h2>
+              <TemplateGrid remote={remote} compact />
+            </section>
+          </>
+        ) : (
+          <TemplateGrid remote={remote} />
+        )}
       </main>
+
+      <button className="fab" onClick={() => setCreating('app')} title="Nuevo proyecto" aria-label="Nuevo proyecto">
+        <Icon name="plus" size={24} strokeWidth={2.4} />
+      </button>
 
       {creating && <NewProjectDialog kind={creating} onClose={() => setCreating(null)} />}
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
@@ -171,6 +299,76 @@ export function Home() {
   )
 }
 
+function ModeDots({ modes }: { modes: { id?: string; name: string; color: string }[] }) {
+  return (
+    <span className="mode-dots" title={modes.map((m) => m.name).join(' · ')}>
+      {modes.slice(0, 6).map((m, i) => (
+        <span key={m.id ?? i} className="mode-dot" style={{ '--mode': m.color } as CSSProperties} />
+      ))}
+      {modes.length > 1 && <span className="mode-dots-n">{modes.length}</span>}
+    </span>
+  )
+}
+
+function TemplateGrid({ remote, compact }: { remote: RemoteTemplate[]; compact?: boolean }) {
+  const previews = useMemo(() => TEMPLATES.map((t) => ({ t, p: t.build() })), [])
+  return (
+    <div className={`tpl-grid${compact ? ' compact' : ''}`}>
+      {remote.map((t) => (
+        <button key={t.id} className="tpl-card" onClick={() => openRemoteTemplate(t)}>
+          <div className="tpl-thumb">{t.cover && <img src={t.cover} alt="" loading="lazy" />}</div>
+          <div className="tpl-body">
+            <b>{t.name}</b>
+            <span className="tpl-desc">{t.description}</span>
+            {t.modes && (
+              <span className="tpl-modes">
+                {t.modes.map((m) => (
+                  <span key={m.name} className="mode-pill" style={{ '--mode': m.color } as CSSProperties}>
+                    {m.name}
+                  </span>
+                ))}
+              </span>
+            )}
+          </div>
+        </button>
+      ))}
+      {previews.map(({ t, p }) => (
+        <button
+          key={t.id}
+          className="tpl-card"
+          onClick={() => {
+            const id = newFromTemplate(t.id)
+            if (id) openProject(id)
+          }}
+        >
+          <div className="tpl-thumb">
+            {p.screens.slice(0, t.kind === 'app' ? 3 : 1).map((s) => (
+              <ScreenThumb
+                key={s.id}
+                screen={s}
+                modeId={p.modes[p.modes.length - 1].id}
+                width={t.kind === 'app' ? 74 : 230}
+                height={150}
+              />
+            ))}
+          </div>
+          <div className="tpl-body">
+            <b>{t.name}</b>
+            <span className="tpl-desc">{t.description}</span>
+            <span className="tpl-modes">
+              {p.modes.map((m) => (
+                <span key={m.id} className="mode-pill" style={{ '--mode': m.color } as CSSProperties}>
+                  {m.name}
+                </span>
+              ))}
+            </span>
+          </div>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function ProjectCard({ project, onDelete, onRename }: { project: Project; onDelete: () => void; onRename: () => void }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const start = project.screens.find((s) => s.id === project.startScreenId) ?? project.screens[0]
@@ -192,7 +390,7 @@ function ProjectCard({ project, onDelete, onRename }: { project: Project; onDele
       <button className="project-open" onClick={() => openProject(project.id)} aria-label={`Abrir ${project.name}`}>
         <div className="project-thumb">
           {start ? (
-            <ScreenThumb screen={start} modeId={project.modes[0].id} width={project.kind === 'app' ? 120 : 260} height={150} />
+            <ScreenThumb screen={start} modeId={project.modes[0].id} width={project.kind === 'app' ? 112 : 250} height={146} />
           ) : (
             <span className="muted">Sin pantallas</span>
           )}
@@ -201,9 +399,11 @@ function ProjectCard({ project, onDelete, onRename }: { project: Project; onDele
       <div className="project-info">
         <div className="project-text">
           <b>{project.name}</b>
-          <span className="muted small">
-            {project.kind === 'app' ? 'App' : 'Web'} · {project.screens.length} pantallas · {project.modes.length}{' '}
-            {project.modes.length === 1 ? 'modo' : 'modos'} · {ago(project.updatedAt)}
+          <span className="project-meta">
+            <span className="kind-tag">{project.kind === 'app' ? 'App' : 'Web'}</span>
+            <span>{project.screens.length} pantallas</span>
+            <ModeDots modes={project.modes} />
+            <span className="muted">{ago(project.updatedAt)}</span>
           </span>
         </div>
         <button
@@ -223,7 +423,7 @@ function ProjectCard({ project, onDelete, onRename }: { project: Project; onDele
 }
 
 function exportJson(project: Project) {
-  return JSON.stringify({ format: 'pulso', version: 1, project }, null, 2)
+  return JSON.stringify({ format: 'hilo', version: 1, project }, null, 2)
 }
 
 function downloadProject(project: Project) {
@@ -232,7 +432,7 @@ function downloadProject(project: Project) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${project.name.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase()}.pulso.json`
+    a.download = `${project.name.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase()}.hilo.json`
     document.body.appendChild(a)
     a.click()
     a.remove()

@@ -180,7 +180,7 @@ describe('proyectos', () => {
 
   it('importa un proyecto exportado y valida el formato', () => {
     const original = TEMPLATES[0].build()
-    const imported = parseProject(JSON.parse(JSON.stringify({ format: 'pulso', version: 1, project: original })))
+    const imported = parseProject(JSON.parse(JSON.stringify({ format: 'hilo', version: 1, project: original })))
     expect(imported.id).not.toBe(original.id)
     expect(imported.screens).toHaveLength(original.screens.length)
     expect(imported.modes).toEqual(original.modes)
