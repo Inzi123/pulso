@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { createMode } from '../model/defaults'
+import { createMode, uid } from '../model/defaults'
 import { parseProject } from '../model/project'
 import { TEMPLATES } from '../model/templates'
 import type { Project, ProjectKind } from '../model/types'
@@ -68,7 +68,12 @@ async function openRemoteTemplate(t: RemoteTemplate) {
     const res = await fetch(t.project)
     if (!res.ok) throw new Error(String(res.status))
     const project = parseProject(await res.json())
+    // Cada vez es un proyecto nuevo: abrir otra vez la plantilla no pisa lo ya editado.
+    const now = Date.now()
+    project.id = uid('prj')
     project.name = t.name
+    project.createdAt = now
+    project.updatedAt = now
     const id = addProject(project)
     openProject(id)
   } catch {
