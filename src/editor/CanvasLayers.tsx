@@ -322,9 +322,13 @@ export const FlowLayer = memo(function FlowLayer({ project, edges, modeId, focus
   )
 })
 
-/** Puntas y puntos de las flechas, con tamaño constante en pantalla. */
+/**
+ * Puntas y puntos de las flechas, con tamaño constante en pantalla. Con poco zoom
+ * se achican y los puntos de salida desaparecen: si no, tapan las pantallas.
+ */
 export const FlowMarkers = memo(function FlowMarkers({ zoom }: { zoom: number }) {
-  const size = 9 / zoom
+  const size = (9 * Math.min(1, Math.max(0.4, zoom / 0.3))) / zoom
+  const dots = zoom >= 0.12
   return (
     <svg className="flow-markers" aria-hidden="true">
       <defs>
@@ -351,7 +355,7 @@ export const FlowMarkers = memo(function FlowMarkers({ zoom }: { zoom: number })
               markerHeight={size}
               markerUnits="userSpaceOnUse"
             >
-              <circle cx="5" cy="5" r="3.6" className={`flow-dot flow-dot-${k}`} />
+              {dots && <circle cx="5" cy="5" r="3.6" className={`flow-dot flow-dot-${k}`} />}
             </marker>
           </g>
         ))}
