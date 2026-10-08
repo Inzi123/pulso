@@ -10,7 +10,10 @@ Editor visual tipo Figma para diseñar **apps y webs**, ver sus **flujos** en un
   haz zoom con `Ctrl`/`⌘` + rueda o pellizcando. `⇧1` encuadra todo.
 - **Pantallas y elementos**: crea pantallas (`F`) con tamaños de móvil, tablet o escritorio y dibuja
   rectángulos, elipses, textos, botones, campos, imágenes e iconos. Guías magnéticas al mover y
-  redimensionar, alinear, copiar/pegar, duplicar (`Alt` + arrastrar), deshacer/rehacer.
+  redimensionar, alinear, copiar/pegar, duplicar (`Alt` + arrastrar), deshacer/rehacer. Cada capa
+  admite sombras, desenfoque de fondo, modos de fusión, filtros y máscaras degradadas; los textos,
+  espaciado entre letras, cursiva y una sola línea. Las fuentes de Google que use un proyecto se
+  cargan solas al abrirlo.
 - **Flujos**: selecciona un elemento y arrastra el círculo azul hasta otra pantalla. Las flechas
   muestran cómo se conecta todo; las de trazo discontinuo abren un modal, las punteadas son pantallas
   que avanzan solas tras un tiempo (cargas, escaneos) y las rojas apuntan a una pantalla que no
@@ -25,7 +28,8 @@ Editor visual tipo Figma para diseñar **apps y webs**, ver sus **flujos** en un
   una pantalla puede no existir. Con «Editando solo …» (`E`) tus cambios afectan únicamente al modo
   activo; los campos que cambian en ese modo se marcan con su color y se pueden restablecer.
   «Comparar modos» (`C`) muestra una pantalla en todos los modos lado a lado.
-- **Guardado automático** en el navegador, exportación e importación en JSON.
+- **Guardado automático** en el navegador (IndexedDB, con copia en localStorage cuando cabe),
+  exportación e importación en JSON.
 - **Plantillas publicadas aparte**: si junto a la app hay un `templates/index.json`, sus proyectos
   aparecen en «Plantillas». Sirve para ofrecer proyectos grandes con imágenes (por ejemplo, flujos
   capturados de otra app) sin incluirlos en el código.
