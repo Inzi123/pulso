@@ -4,6 +4,7 @@ import { parseProject } from '../model/project'
 import { TEMPLATES } from '../model/templates'
 import type { Project, ProjectKind } from '../model/types'
 import { ScreenThumb } from '../render/ElementView'
+import { ensureFonts } from '../render/fonts'
 import { Icon } from '../render/icons'
 import { HiloMark } from '../ui/Brand'
 import { Dialog, Menu, Segmented, type MenuEntry } from '../ui/controls'
@@ -372,6 +373,9 @@ function TemplateGrid({ remote, compact }: { remote: RemoteTemplate[]; compact?:
 function ProjectCard({ project, onDelete, onRename }: { project: Project; onDelete: () => void; onRename: () => void }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const start = project.screens.find((s) => s.id === project.startScreenId) ?? project.screens[0]
+  useEffect(() => {
+    if (start) ensureFonts(start.elements.map((e) => e.props.fontFamily))
+  }, [start])
   const items: MenuEntry[] = [
     { label: 'Abrir', icon: 'arrow-right', onSelect: () => openProject(project.id) },
     { label: 'Renombrar', icon: 'edit', onSelect: onRename },

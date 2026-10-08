@@ -21,6 +21,24 @@ export type Transition =
   | 'slide-right'
   | 'slide-up'
 
+export type BlendMode =
+  | ''
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
+  | 'darken'
+  | 'lighten'
+  | 'color-dodge'
+  | 'color-burn'
+  | 'hard-light'
+  | 'soft-light'
+  | 'difference'
+  | 'exclusion'
+  | 'hue'
+  | 'saturation'
+  | 'color'
+  | 'luminosity'
+
 export type InteractionAction = 'navigate' | 'overlay' | 'back' | 'close' | 'url'
 
 export interface Interaction {
@@ -52,13 +70,26 @@ export interface ElementProps {
   stroke: string
   strokeWidth: number
   radius: number
-  shadow: Shadow
+  /** Uno de los ajustes predefinidos o un box-shadow CSS completo. */
+  shadow: Shadow | (string & {})
+  /** Desenfoque del fondo que queda detrás (cristal esmerilado), en px. */
+  blur: number
+  /** Máscara CSS (por ejemplo un degradado que funde la imagen con el fondo). */
+  mask: string
+  /** Filtros CSS de la capa (desenfoque, saturación, sombra proyectada…). */
+  filter: string
+  /** Modo de fusión con lo que hay debajo ('' es normal). */
+  blend: BlendMode
   text: string
   color: string
   fontFamily: string
   fontSize: number
   fontWeight: number
   lineHeight: number
+  letterSpacing: number
+  italic: boolean
+  /** Texto en una sola línea, sin saltos automáticos. */
+  nowrap: boolean
   textAlign: TextAlign
   src: string
   fit: ImageFit

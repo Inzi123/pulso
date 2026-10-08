@@ -834,6 +834,14 @@ export function Canvas() {
   const focusElementIds = selection.kind === 'elements' ? selection.ids : []
   const focusScreenIds = selection.kind === 'screens' ? selection.ids : []
 
+  const viewport = useStore((s) => s.viewport)
+  const margin = 0.35
+  const visibleWorld: Rect = {
+    x: (-camera.x - viewport.w * margin) / camera.zoom,
+    y: (-camera.y - viewport.h * margin) / camera.zoom,
+    width: (viewport.w * (1 + margin * 2)) / camera.zoom,
+    height: (viewport.h * (1 + margin * 2)) / camera.zoom,
+  }
   const grid = gridStyle(camera)
   const cursor = panning ? 'grabbing' : spaceDown || tool === 'hand' ? 'grab' : tool === 'move' ? 'default' : 'crosshair'
 
@@ -870,16 +878,27 @@ export function Canvas() {
             style={{ left: sec.x, top: sec.y, width: sec.width, height: sec.height, '--sec': sec.color } as CSSProperties}
           />
         ))}
-        {project.screens.map((s) => (
-          <ScreenView
-            key={s.id}
-            screen={s}
-            modeId={modeId}
-            editingId={editingTextId && s.elements.some((e) => e.id === editingTextId) ? editingTextId : null}
-            lifted={liftedScreenId === s.id}
-            dropTarget={overlay.dropScreenId === s.id || overlay.connect?.target === s.id}
-          />
-        ))}
+        {project.screens.map((s) =>
+          // Fuera de la vista solo se dibuja el fondo: con cientos de capas por pantalla, el lienzo sigue fluido.
+          intersects(screenRect(s), visibleWorld) || liftedScreenId === s.id ? (
+            <ScreenView
+              key={s.id}
+              screen={s}
+              modeId={modeId}
+              editingId={editingTextId && s.elements.some((e) => e.id === editingTextId) ? editingTextId : null}
+              lifted={liftedScreenId === s.id}
+              dropTarget={overlay.dropScreenId === s.id || overlay.connect?.target === s.id}
+              lod={camera.zoom < 0.14}
+            />
+          ) : (
+            <div
+              key={s.id}
+              data-screen={s.id}
+              className="screen"
+              style={{ left: s.x, top: s.y, width: s.width, height: s.height, background: s.fill || 'transparent' }}
+            />
+          ),
+        )}
         {showFlows && (
           <FlowLayer
             project={project}

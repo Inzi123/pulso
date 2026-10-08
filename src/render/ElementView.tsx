@@ -3,7 +3,7 @@ import { resolveProps } from '../model/modes'
 import type { DesignElement, ElementProps, Id, Screen } from '../model/types'
 import { Icon } from './icons'
 
-const SHADOWS: Record<ElementProps['shadow'], string> = {
+const SHADOWS: Record<string, string> = {
   none: 'none',
   sm: '0 1px 2px rgba(16,24,40,.08), 0 1px 3px rgba(16,24,40,.06)',
   md: '0 6px 16px rgba(16,24,40,.10), 0 2px 4px rgba(16,24,40,.06)',
@@ -27,7 +27,15 @@ export function elementStyle(type: DesignElement['type'], p: ElementProps): CSSP
     background: p.fill || 'transparent',
     borderRadius: type === 'ellipse' ? '50%' : p.radius,
     border: p.stroke && p.strokeWidth > 0 ? `${p.strokeWidth}px solid ${p.stroke}` : undefined,
-    boxShadow: SHADOWS[p.shadow],
+    boxShadow: SHADOWS[p.shadow] ?? p.shadow,
+    backdropFilter: p.blur ? `blur(${p.blur}px)` : undefined,
+    WebkitBackdropFilter: p.blur ? `blur(${p.blur}px)` : undefined,
+    mask: p.mask || undefined,
+    WebkitMask: p.mask || undefined,
+    filter: p.filter || undefined,
+    mixBlendMode: p.blend || undefined,
+    letterSpacing: p.letterSpacing ? `${p.letterSpacing}px` : undefined,
+    fontStyle: p.italic ? 'italic' : undefined,
     boxSizing: 'border-box',
     color: p.color,
     fontFamily: fontStack(p.fontFamily),
@@ -122,7 +130,7 @@ export const ElementView = memo(function ElementView({
 
   return (
     <div
-      className={`el el-${el.type}${interactive ? ' el-hotspot' : ''}`}
+      className={`el el-${el.type}${interactive ? ' el-hotspot' : ''}${p.nowrap ? ' el-nowrap' : ''}`}
       data-el={context === 'canvas' ? el.id : undefined}
       style={style}
       onClick={

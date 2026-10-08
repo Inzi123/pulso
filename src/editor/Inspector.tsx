@@ -5,6 +5,7 @@ import { computeFlows } from '../model/flows'
 import { isOverridden, isScreenAvailable, overriddenKeys, PROP_LABELS, resolveProps, setVisibleInMode } from '../model/modes'
 import { findScreen, screenRect, screensInside } from '../model/project'
 import type {
+  BlendMode,
   DesignElement,
   ElementProps,
   InteractionAction,
@@ -34,6 +35,25 @@ import {
   useStore,
   type AlignKind,
 } from '../store/store'
+
+const BLEND_OPTIONS: { value: BlendMode; label: string }[] = [
+  { value: '', label: 'Normal' },
+  { value: 'multiply', label: 'Multiplicar' },
+  { value: 'screen', label: 'Trama' },
+  { value: 'overlay', label: 'Superponer' },
+  { value: 'soft-light', label: 'Luz suave' },
+  { value: 'hard-light', label: 'Luz fuerte' },
+  { value: 'darken', label: 'Oscurecer' },
+  { value: 'lighten', label: 'Aclarar' },
+  { value: 'color-dodge', label: 'Sobreexponer color' },
+  { value: 'color-burn', label: 'Subexponer color' },
+  { value: 'difference', label: 'Diferencia' },
+  { value: 'exclusion', label: 'Exclusión' },
+  { value: 'hue', label: 'Tono' },
+  { value: 'saturation', label: 'Saturación' },
+  { value: 'color', label: 'Color' },
+  { value: 'luminosity', label: 'Luminosidad' },
+]
 
 export function Inspector({ project }: { project: Project }) {
   const selection = useStore((s) => s.selection)
@@ -589,9 +609,38 @@ function ElementInspector({ project, screen, els, mode }: { project: Project; sc
                   { value: 'sm', label: 'Suave' },
                   { value: 'md', label: 'Media' },
                   { value: 'lg', label: 'Intensa' },
+                  ...(['none', 'sm', 'md', 'lg'].includes(first.shadow) ? [] : [{ value: first.shadow, label: 'Personalizada' }]),
                 ]}
               />
             </div>
+            <div className="row">
+              <L k="blur">Desenfoque de fondo</L>
+              <NumberField label="px" value={num('blur')} min={0} max={100} onChange={(v) => set({ blur: v }, 'blur')} />
+            </div>
+            <div className="row">
+              <L k="blend">Fusión</L>
+              <Select
+                value={first.blend}
+                onChange={(v) => set({ blend: v })}
+                options={BLEND_OPTIONS}
+              />
+            </div>
+            {props.some((p) => p.filter) && (
+              <div className="row">
+                <L k="filter">Filtros</L>
+                <button className="btn" onClick={() => set({ filter: '' })} title={first.filter}>
+                  Quitar
+                </button>
+              </div>
+            )}
+            {props.some((p) => p.mask) && (
+              <div className="row">
+                <L k="mask">Máscara degradada</L>
+                <button className="btn" onClick={() => set({ mask: '' })}>
+                  Quitar
+                </button>
+              </div>
+            )}
             <div className="row">
               <Toggle
                 id="fixed-toggle"
@@ -716,7 +765,11 @@ function TextSection({ els, props, set }: { els: DesignElement[]; props: Element
       />
       <div className="row">
         <L k="fontFamily">Fuente</L>
-        <Select value={first.fontFamily} onChange={(v) => set({ fontFamily: v })} options={FONT_FAMILIES} />
+        <Select
+          value={first.fontFamily}
+          onChange={(v) => set({ fontFamily: v })}
+          options={FONT_FAMILIES.some((f) => f.value === first.fontFamily) ? FONT_FAMILIES : [{ value: first.fontFamily, label: first.fontFamily }, ...FONT_FAMILIES]}
+        />
       </div>
       <div className="grid2">
         <div className="field-col">
@@ -735,6 +788,10 @@ function TextSection({ els, props, set }: { els: DesignElement[]; props: Element
               { value: '700', label: 'Bold' },
             ]}
           />
+        </div>
+        <div className="field-col">
+          <L k="letterSpacing">Espaciado</L>
+          <NumberField label="px" value={common(props.map((p) => p.letterSpacing))} min={-20} max={40} step={0.1} precision={1} onChange={(v) => set({ letterSpacing: v }, 'ls')} />
         </div>
         <div className="field-col">
           <L k="lineHeight">Interlineado</L>

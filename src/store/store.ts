@@ -47,6 +47,7 @@ import type {
   Section,
 } from '../model/types'
 import { TEMPLATES } from '../model/templates'
+import { idbGet, idbSet } from './idb'
 
 export type Tool =
   | 'move'
@@ -142,7 +143,7 @@ function initialDocuments() {
   const saved = loadSaved()
   if (saved && saved.order.length > 0) return saved
   const sample = TEMPLATES[0].build()
-  return { projects: { [sample.id]: sample }, order: [sample.id] }
+  return { projects: { [sample.id]: sample }, order: [sample.id], seeded: sample.id }
 }
 
 const docs = initialDocuments()
@@ -170,26 +171,75 @@ export const useStore = create<State>(() => ({
   toasts: [],
 }))
 
+type Saved = { projects: Project[]; order: Id[] }
+
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 let warnedQuota = false
+let hydrated = false
+
+function snapshot(): Saved {
+  const { projects, order } = useStore.getState()
+  return { projects: order.map((id) => projects[id]).filter(Boolean), order }
+}
+
+/** Guarda en IndexedDB y, si cabe, también en localStorage como copia. */
+async function persist() {
+  const data = snapshot()
+  let ok = false
+  try {
+    await idbSet(STORAGE_KEY, data)
+    ok = true
+  } catch {
+    /* sin IndexedDB: queda localStorage */
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch {
+    try {
+      // Demasiado grande para localStorage: se quita la copia antigua para no confundir.
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      /* nada */
+    }
+    if (!ok && !warnedQuota) {
+      warnedQuota = true
+      toast('No se pudieron guardar los cambios en este navegador. Exporta el proyecto para no perderlo.', 'error')
+    }
+  }
+}
+
 useStore.subscribe((state, prev) => {
   if (state.projects === prev.projects && state.order === prev.order) return
+  if (!hydrated) return
   clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    const { projects, order } = useStore.getState()
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ projects: order.map((id) => projects[id]), order }),
-      )
-    } catch {
-      if (!warnedQuota) {
-        warnedQuota = true
-        toast('No se pudieron guardar los cambios en este navegador. Exporta el proyecto para no perderlo.', 'error')
-      }
-    }
-  }, 400)
+  saveTimer = setTimeout(() => void persist(), 500)
 })
+
+/** Al arrancar se leen los proyectos de IndexedDB, que pueden ser más que los de localStorage. */
+void (async () => {
+  try {
+    const saved = await idbGet<Saved>(STORAGE_KEY)
+    if (saved && Array.isArray(saved.projects) && saved.projects.length) {
+      const projects: Record<Id, Project> = {}
+      for (const p of saved.projects) projects[p.id] = p
+      const order = saved.order.filter((id) => projects[id])
+      for (const id of Object.keys(projects)) if (!order.includes(id)) order.push(id)
+      // Lo creado o abierto antes de terminar de leer (raro) se conserva tal cual está.
+      const current = useStore.getState()
+      const seeded = (docs as { seeded?: string }).seeded
+      for (const id of current.order) {
+        if (id === seeded && current.openId !== id) continue
+        if (!projects[id]) order.unshift(id)
+        if (!projects[id] || current.openId === id) projects[id] = current.projects[id]
+      }
+      useStore.setState({ projects, order })
+    }
+  } catch {
+    /* sin IndexedDB: se sigue con localStorage */
+  }
+  hydrated = true
+  void persist()
+})()
 
 /* ---------- Utilidades ---------- */
 

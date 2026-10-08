@@ -16,9 +16,13 @@ interface ScreenViewProps {
   editingId: Id | null
   lifted: boolean
   dropTarget: boolean
+  /** Zoom muy lejano: se omiten los elementos diminutos. */
+  lod: boolean
 }
 
-export const ScreenView = memo(function ScreenView({ screen, modeId, editingId, lifted, dropTarget }: ScreenViewProps) {
+const bigEnough = (p: ElementProps) => p.width * p.height > 1600
+
+export const ScreenView = memo(function ScreenView({ screen, modeId, editingId, lifted, dropTarget, lod }: ScreenViewProps) {
   const available = isScreenAvailable(screen, modeId)
   const editing = editingId ? screen.elements.find((e) => e.id === editingId) : undefined
   return (
@@ -33,7 +37,7 @@ export const ScreenView = memo(function ScreenView({ screen, modeId, editingId, 
         background: screen.fill || 'transparent',
       }}
     >
-      <ScreenContent screen={screen} modeId={modeId} context="canvas" editingId={editingId} />
+      <ScreenContent screen={screen} modeId={modeId} context="canvas" editingId={editingId} filter={lod ? bigEnough : undefined} />
       {editing && (
         <InlineTextEditor key={editing.id} screenId={screen.id} el={editing} props={resolveProps(editing, modeId)} />
       )}

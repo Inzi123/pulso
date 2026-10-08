@@ -1449,6 +1449,9 @@ a:focus-visible {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.el-nowrap .el-content {
+  white-space: pre;
+}
 .el-content-input {
   overflow: hidden;
   text-overflow: ellipsis;

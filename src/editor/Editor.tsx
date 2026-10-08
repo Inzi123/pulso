@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Player } from '../player/Player'
+import { ensureFonts, projectFonts } from '../render/fonts'
 import { togglePanel, useStore } from '../store/store'
 import { Canvas } from './Canvas'
 import { CompareDialog, HelpDialog } from './Dialogs'
@@ -24,6 +25,13 @@ export function Editor() {
       togglePanel('right', true)
     }
   }, [])
+
+  const fontsKey = project?.id
+  useEffect(() => {
+    if (project) ensureFonts(projectFonts(project))
+    // Solo al abrir otro proyecto; las fuentes nuevas se cargan al usarlas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontsKey])
 
   if (!project) return null
   return (
