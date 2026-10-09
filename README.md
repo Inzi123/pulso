@@ -28,6 +28,11 @@ Editor visual tipo Figma para diseñar **apps y webs**, ver sus **flujos** en un
   una pantalla puede no existir. Con «Editando solo …» (`E`) tus cambios afectan únicamente al modo
   activo; los campos que cambian en ese modo se marcan con su color y se pueden restablecer.
   «Comparar modos» (`C`) muestra una pantalla en todos los modos lado a lado.
+- **Asistente con IA** (botón ✦ Asistente): pregúntale por el proyecto o pídele cambios —textos,
+  colores, capas, pantallas nuevas, flujos, diferencias entre modos— y los hace en el lienzo; todo se
+  deshace con `Ctrl`/`⌘` + `Z`. Dentro de un artefacto de claude.ai usa Claude con la cuenta de quien
+  lo abre, sin clave. En cualquier otro sitio, pega tu API key de Anthropic en los ajustes del
+  asistente: se guarda solo en tu navegador y las llamadas van directo de tu navegador a Anthropic.
 - **Guardado automático** en el navegador (IndexedDB, con copia en localStorage cuando cabe),
   exportación e importación en JSON.
 - **Plantillas publicadas aparte**: si junto a la app hay un `templates/index.json`, sus proyectos
@@ -51,3 +56,5 @@ npm run build    # compila en dist/
 Hecho con React, TypeScript, Zustand e Immer. El modelo (`src/model`) es independiente de la
 interfaz: `modes.ts` resuelve las propiedades de cada modo, `flows.ts` calcula los flujos y la
 navegación del prototipo y `templates.ts` contiene los proyectos de ejemplo.
+El asistente vive en `src/ai`: `tools.ts` define lo que puede leer y cambiar del proyecto y
+`backends.ts` lo conecta con Claude (capacidad `sample` de claude.ai o la API con tu clave).

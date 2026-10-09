@@ -118,6 +118,8 @@ interface State {
   toasts: Toast[]
   /** Ya se leyeron los proyectos guardados. */
   ready: boolean
+  /** Panel del asistente abierto. */
+  aiOpen: boolean
 }
 
 /* ---------- Persistencia ---------- */
@@ -182,6 +184,7 @@ export const useStore = create<State>(() => ({
   clipboard: null,
   toasts: [],
   ready: false,
+  aiOpen: false,
 }))
 
 /** Último objeto guardado de cada proyecto: si no cambió, no se reescribe. */

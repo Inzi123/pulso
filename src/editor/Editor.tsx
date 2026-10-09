@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { AiPanel } from '../ai/AiPanel'
 import { Player } from '../player/Player'
 import { ensureFonts, projectFonts } from '../render/fonts'
 import { togglePanel, useStore } from '../store/store'
@@ -14,6 +15,7 @@ export function Editor() {
   const project = useStore((s) => (s.openId ? s.projects[s.openId] : null))
   const panels = useStore((s) => s.panels)
   const player = useStore((s) => s.player)
+  const aiOpen = useStore((s) => s.aiOpen)
   useShortcuts()
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export function Editor() {
           <Toolbar />
         </div>
         {panels.right && <Inspector project={project} />}
+        {aiOpen && <AiPanel projectId={project.id} />}
       </div>
       {player && <Player project={project} />}
       <CompareDialog project={project} />

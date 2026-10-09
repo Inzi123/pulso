@@ -33,6 +33,7 @@ export function TopBar({ project }: { project: Project }) {
   const canUndo = useStore((s) => s.past.length > 0)
   const canRedo = useStore((s) => s.future.length > 0)
   const panels = useStore((s) => s.panels)
+  const aiOpen = useStore((s) => s.aiOpen)
   const [zoomMenu, setZoomMenu] = useState<{ x: number; y: number } | null>(null)
   const [modesOpen, setModesOpen] = useState(false)
   const mode = project.modes.find((m) => m.id === modeId)
@@ -144,6 +145,14 @@ export function TopBar({ project }: { project: Project }) {
           onClick={() => togglePanel('right')}
         >
           <Icon name="panel-right" size={16} />
+        </button>
+        <button
+          className={`ai-btn${aiOpen ? ' on' : ''}`}
+          onClick={() => setState({ aiOpen: !aiOpen })}
+          title="Asistente con IA"
+        >
+          <Icon name="sparkles" size={15} />
+          <span className="hide-sm">Asistente</span>
         </button>
         <button className="play-btn" onClick={() => play()} title={`Probar prototipo (${MOD}↵)`}>
           <Icon name="play" size={14} strokeWidth={2.2} />
