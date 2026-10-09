@@ -16,11 +16,15 @@ interface ScreenViewProps {
   editingId: Id | null
   lifted: boolean
   dropTarget: boolean
-  /** Zoom muy lejano: se omiten los elementos diminutos. */
-  lod: boolean
+  /** Nivel de detalle: 0 todo; 1-3 cada vez más lejos. */
+  lod: number
 }
 
-const bigEnough = (p: ElementProps) => p.width * p.height > 1600
+/** Con poco zoom, lo diminuto no se ve y los efectos no se distinguen: se omiten. */
+const MIN_AREA = [0, 1600, 8000, 40000]
+const LOD_FILTERS = MIN_AREA.map((min, level) =>
+  level === 0 ? undefined : (p: ElementProps) => p.width * p.height > min && (level < 2 || !p.blend),
+)
 
 export const ScreenView = memo(function ScreenView({ screen, modeId, editingId, lifted, dropTarget, lod }: ScreenViewProps) {
   const available = isScreenAvailable(screen, modeId)
@@ -37,7 +41,14 @@ export const ScreenView = memo(function ScreenView({ screen, modeId, editingId, 
         background: screen.fill || 'transparent',
       }}
     >
-      <ScreenContent screen={screen} modeId={modeId} context="canvas" editingId={editingId} filter={lod ? bigEnough : undefined} />
+      <ScreenContent
+        screen={screen}
+        modeId={modeId}
+        context="canvas"
+        editingId={editingId}
+        filter={LOD_FILTERS[lod]}
+        simple={lod >= 2}
+      />
       {editing && (
         <InlineTextEditor key={editing.id} screenId={screen.id} el={editing} props={resolveProps(editing, modeId)} />
       )}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BASE_PROPS } from '../model/defaults'
 import { computeFlows } from '../model/flows'
 import {
@@ -62,6 +62,11 @@ import {
   ScreenView,
   SelectionOverlay,
 } from './CanvasLayers'
+
+/** Nivel de detalle según el zoom (0: todo; 3: solo lo grande y sin efectos). */
+function lodLevel(zoom: number) {
+  return zoom >= 0.14 ? 0 : zoom >= 0.09 ? 1 : zoom >= 0.05 ? 2 : 3
+}
 
 type Drag =
   | { type: 'pan'; sx: number; sy: number; cam: Camera }
@@ -783,8 +788,24 @@ export function Canvas() {
     setMenu({ x: e.clientX, y: e.clientY, items: contextItems(screenId ?? null) })
   }
 
+  /* ----- Movimiento de cámara ----- */
+  // Mientras se desplaza o hace zoom, el mundo va en su propia capa y el navegador
+  // mueve lo ya dibujado en vez de repintar cada fotograma; al parar se redibuja nítido.
+  const worldRef = useRef<HTMLDivElement>(null)
+  const movingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useLayoutEffect(() => {
+    const w = worldRef.current
+    if (!w) return
+    w.classList.add('moving')
+    clearTimeout(movingTimer.current)
+    movingTimer.current = setTimeout(() => w.classList.remove('moving'), 220)
+  }, [camera])
+  useEffect(() => () => clearTimeout(movingTimer.current), [])
+
   /* ----- Datos derivados para las capas ----- */
-  const edges = useMemo(() => (showFlows ? computeFlows(project, modeId) : []), [project, modeId, showFlows])
+  // Las flechas se actualizan con prioridad baja: arrastrar no espera a redibujarlas.
+  const flowProject = useDeferredValue(project)
+  const edges = useMemo(() => (showFlows ? computeFlows(flowProject, modeId) : []), [flowProject, modeId, showFlows])
 
   const toScreenRect = (r: Rect): Rect => {
     const p = worldToScreen(camera, r.x, r.y)
@@ -863,6 +884,7 @@ export function Canvas() {
       onContextMenu={onContextMenu}
     >
       <div
+        ref={worldRef}
         className="world"
         style={
           {
@@ -888,7 +910,7 @@ export function Canvas() {
               editingId={editingTextId && s.elements.some((e) => e.id === editingTextId) ? editingTextId : null}
               lifted={liftedScreenId === s.id}
               dropTarget={overlay.dropScreenId === s.id || overlay.connect?.target === s.id}
-              lod={camera.zoom < 0.14}
+              lod={lodLevel(camera.zoom)}
             />
           ) : (
             <div
@@ -901,7 +923,7 @@ export function Canvas() {
         )}
         {showFlows && (
           <FlowLayer
-            project={project}
+            project={flowProject}
             edges={edges}
             modeId={modeId}
             focus={[...focusElementIds, ...focusScreenIds].join(',')}

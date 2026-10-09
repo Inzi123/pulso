@@ -8,9 +8,18 @@ import type {
 } from './types'
 
 /** Propiedades efectivas de un elemento en un modo: base + cambios del modo. */
+// Los elementos son inmutables: el resultado por modo se guarda mientras viva el objeto.
+// Así un elemento con cambios en un modo no se vuelve a dibujar si nada cambió.
+const resolved = new WeakMap<DesignElement, Map<Id, ElementProps>>()
+
 export function resolveProps(el: DesignElement, modeId: Id): ElementProps {
   const ov = el.overrides[modeId]
-  return ov ? { ...el.props, ...ov } : el.props
+  if (!ov) return el.props
+  let byMode = resolved.get(el)
+  if (!byMode) resolved.set(el, (byMode = new Map()))
+  let p = byMode.get(modeId)
+  if (!p) byMode.set(modeId, (p = { ...el.props, ...ov }))
+  return p
 }
 
 export function isScreenAvailable(screen: Screen, modeId: Id): boolean {

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useDeferredValue, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { computeFlows } from '../model/flows'
 import { isOverridden, isScreenAvailable, overriddenKeys, resolveProps } from '../model/modes'
 import { elementWorldRect, findScreen, screenRect } from '../model/project'
@@ -46,7 +46,9 @@ function closeOnNarrow() {
   if (window.innerWidth < 900) togglePanel('left', false)
 }
 
-export function LayersPanel({ project }: { project: Project }) {
+export function LayersPanel({ project: live }: { project: Project }) {
+  // La lista se pone al día con prioridad baja: no frena el lienzo al arrastrar.
+  const project = useDeferredValue(live)
   const selection = useStore((s) => s.selection)
   const modeId = useStore((s) => s.modeId)
   const mode = project.modes.find((m) => m.id === modeId)

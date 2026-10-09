@@ -70,6 +70,8 @@ interface ElementViewProps {
   editing?: boolean
   onActivate?: (el: DesignElement, props: ElementProps) => void
   children?: ReactNode
+  /** Vista lejana: sin sombras, desenfoques, filtros ni fusión (no se distinguen y cuestan). */
+  simple?: boolean
 }
 
 function textContent(type: DesignElement['type'], p: ElementProps, context: RenderContext): ReactNode {
@@ -95,8 +97,16 @@ export const ElementView = memo(function ElementView({
   context,
   editing,
   onActivate,
+  simple,
 }: ElementViewProps) {
   const style = elementStyle(el.type, p)
+  if (simple) {
+    style.boxShadow = undefined
+    style.backdropFilter = undefined
+    style.WebkitBackdropFilter = undefined
+    style.filter = undefined
+    style.mixBlendMode = undefined
+  }
   const interactive = context === 'player' && !!p.interaction
   if (interactive) style.cursor = 'pointer'
 
@@ -155,6 +165,7 @@ interface ScreenContentProps {
   onActivate?: (el: DesignElement, props: ElementProps) => void
   /** Solo pinta los elementos que cumplen el filtro (p. ej. fijos / no fijos). */
   filter?: (p: ElementProps) => boolean
+  simple?: boolean
 }
 
 /** Pinta los elementos visibles de una pantalla en un modo. */
@@ -165,6 +176,7 @@ export function ScreenContent({
   editingId,
   onActivate,
   filter,
+  simple,
 }: ScreenContentProps) {
   return (
     <>
@@ -180,6 +192,7 @@ export function ScreenContent({
             context={context}
             editing={editingId === el.id}
             onActivate={onActivate}
+            simple={simple}
           />
         )
       })}

@@ -1413,14 +1413,19 @@ a:focus-visible {
   top: 0;
   transform-origin: 0 0;
 }
+.world.moving {
+  will-change: transform;
+}
 .screen {
   position: absolute;
   overflow: hidden;
   box-shadow: var(--screen-shadow);
+  contain: layout style paint;
 }
 .screen-lifted {
   overflow: visible;
   z-index: 5;
+  contain: none;
 }
 .screen-unavailable {
   opacity: 0.38;

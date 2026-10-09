@@ -47,7 +47,7 @@ import type {
   Section,
 } from '../model/types'
 import { TEMPLATES } from '../model/templates'
-import { idbGet, idbSet } from './idb'
+import { idbGet, idbGetMany, idbWrite } from './idb'
 
 export type Tool =
   | 'move'
@@ -116,31 +116,43 @@ interface State {
   future: Project[]
   clipboard: Clipboard | null
   toasts: Toast[]
+  /** Ya se leyeron los proyectos guardados. */
+  ready: boolean
 }
 
 /* ---------- Persistencia ---------- */
 
-const STORAGE_KEY = 'hilo:v1'
-/** Clave usada antes de que la app se llamara Hilo. */
-const LEGACY_KEY = 'pulso:v1'
+// Cada proyecto se guarda aparte en IndexedDB y solo se reescribe el que cambió,
+// en un momento ocioso. Las versiones anteriores guardaban todo junto (también en
+// localStorage); eso solo se lee para migrar.
+const LEGACY_KEYS = ['hilo:v1', 'pulso:v1']
+const ORDER_KEY = 'hilo:v2:order'
+const projectKey = (id: Id) => `hilo:v2:p:${id}`
 
-function loadSaved(): { projects: Record<Id, Project>; order: Id[] } | null {
+type Saved = { projects: Project[]; order: Id[] }
+
+function fromSaved(data: Saved): { projects: Record<Id, Project>; order: Id[] } {
+  const projects: Record<Id, Project> = {}
+  for (const p of data.projects) if (p?.id) projects[p.id] = p
+  const order = data.order.filter((id) => projects[id])
+  for (const id of Object.keys(projects)) if (!order.includes(id)) order.push(id)
+  return { projects, order }
+}
+
+function loadLocalStorage(): { projects: Record<Id, Project>; order: Id[] } | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY)
-    if (!raw) return null
-    const data = JSON.parse(raw) as { projects: Project[]; order: Id[] }
-    const projects: Record<Id, Project> = {}
-    for (const p of data.projects) projects[p.id] = p
-    const order = data.order.filter((id) => projects[id])
-    for (const id of Object.keys(projects)) if (!order.includes(id)) order.push(id)
-    return { projects, order }
+    for (const key of LEGACY_KEYS) {
+      const raw = localStorage.getItem(key)
+      if (raw) return fromSaved(JSON.parse(raw) as Saved)
+    }
   } catch {
-    return null
+    /* datos dañados: se empieza de cero */
   }
+  return null
 }
 
 function initialDocuments() {
-  const saved = loadSaved()
+  const saved = loadLocalStorage()
   if (saved && saved.order.length > 0) return saved
   const sample = TEMPLATES[0].build()
   return { projects: { [sample.id]: sample }, order: [sample.id], seeded: sample.id }
@@ -169,61 +181,105 @@ export const useStore = create<State>(() => ({
   future: [],
   clipboard: null,
   toasts: [],
+  ready: false,
 }))
 
-type Saved = { projects: Project[]; order: Id[] }
-
-let saveTimer: ReturnType<typeof setTimeout> | undefined
-let warnedQuota = false
+/** Último objeto guardado de cada proyecto: si no cambió, no se reescribe. */
+const savedRefs = new Map<Id, Project>()
+let savedOrder: Id[] | null = null
+let idbOk = true
 let hydrated = false
+let warnedSave = false
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+let saving: Promise<void> = Promise.resolve()
 
-function snapshot(): Saved {
+async function persist() {
   const { projects, order } = useStore.getState()
-  return { projects: order.map((id) => projects[id]).filter(Boolean), order }
+  if (!idbOk) {
+    // Sin IndexedDB (algunos modos privados): todo en localStorage, si cabe.
+    try {
+      localStorage.setItem(LEGACY_KEYS[0], JSON.stringify({ projects: order.map((id) => projects[id]), order }))
+    } catch {
+      warnSave()
+    }
+    return
+  }
+  const puts: [string, unknown][] = []
+  const written: [Id, Project][] = []
+  for (const id of order) {
+    const p = projects[id]
+    if (p && savedRefs.get(id) !== p) {
+      puts.push([projectKey(id), p])
+      written.push([id, p])
+    }
+  }
+  const removed = [...savedRefs.keys()].filter((id) => !projects[id])
+  if (order !== savedOrder) puts.push([ORDER_KEY, order])
+  if (!puts.length && !removed.length) return
+  try {
+    await idbWrite(puts, removed.map(projectKey))
+    for (const [id, p] of written) savedRefs.set(id, p)
+    for (const id of removed) savedRefs.delete(id)
+    savedOrder = order
+  } catch {
+    warnSave()
+  }
 }
 
-/** Guarda en IndexedDB y, si cabe, también en localStorage como copia. */
-async function persist() {
-  const data = snapshot()
-  let ok = false
-  try {
-    await idbSet(STORAGE_KEY, data)
-    ok = true
-  } catch {
-    /* sin IndexedDB: queda localStorage */
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    try {
-      // Demasiado grande para localStorage: se quita la copia antigua para no confundir.
-      localStorage.removeItem(STORAGE_KEY)
-    } catch {
-      /* nada */
-    }
-    if (!ok && !warnedQuota) {
-      warnedQuota = true
-      toast('No se pudieron guardar los cambios en este navegador. Exporta el proyecto para no perderlo.', 'error')
-    }
-  }
+function warnSave() {
+  if (warnedSave) return
+  warnedSave = true
+  toast('No se pudieron guardar los cambios en este navegador. Exporta el proyecto para no perderlo.', 'error')
+}
+
+/** Guarda ya (encadenado para que dos guardados no se pisen). */
+function flush() {
+  clearTimeout(saveTimer)
+  saving = saving.then(persist, persist)
+  return saving
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback
+    if (idle) idle(() => void flush(), { timeout: 2000 })
+    else void flush()
+  }, 600)
 }
 
 useStore.subscribe((state, prev) => {
   if (state.projects === prev.projects && state.order === prev.order) return
-  if (!hydrated) return
-  clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => void persist(), 500)
+  if (hydrated) scheduleSave()
 })
 
-/** Al arrancar se leen los proyectos de IndexedDB, que pueden ser más que los de localStorage. */
+if (typeof document !== 'undefined') {
+  // Al cambiar de pestaña o cerrar, lo pendiente se guarda enseguida.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && hydrated) void flush()
+  })
+}
+
+async function readSaved(): Promise<{ projects: Record<Id, Project>; order: Id[] } | null> {
+  const order = await idbGet<Id[]>(ORDER_KEY)
+  if (order) {
+    const list = await idbGetMany<Project>(order.map(projectKey))
+    const data = fromSaved({ projects: list.filter((p): p is Project => !!p), order })
+    for (const id of data.order) savedRefs.set(id, data.projects[id])
+    savedOrder = data.order
+    return data
+  }
+  // Formato anterior: todo junto bajo una clave.
+  const legacy = await idbGet<Saved>(LEGACY_KEYS[0])
+  return legacy && Array.isArray(legacy.projects) && legacy.projects.length ? fromSaved(legacy) : null
+}
+
+/** Al arrancar se leen los proyectos de IndexedDB; hasta entonces la app espera. */
 void (async () => {
   try {
-    const saved = await idbGet<Saved>(STORAGE_KEY)
-    if (saved && Array.isArray(saved.projects) && saved.projects.length) {
-      const projects: Record<Id, Project> = {}
-      for (const p of saved.projects) projects[p.id] = p
-      const order = saved.order.filter((id) => projects[id])
-      for (const id of Object.keys(projects)) if (!order.includes(id)) order.push(id)
+    const saved = await readSaved()
+    if (saved && saved.order.length) {
+      const { projects, order } = saved
       // Lo creado o abierto antes de terminar de leer (raro) se conserva tal cual está.
       const current = useStore.getState()
       const seeded = (docs as { seeded?: string }).seeded
@@ -235,10 +291,20 @@ void (async () => {
       useStore.setState({ projects, order })
     }
   } catch {
-    /* sin IndexedDB: se sigue con localStorage */
+    idbOk = false
   }
   hydrated = true
-  void persist()
+  useStore.setState({ ready: true })
+  await flush()
+  if (idbOk && !warnedSave) {
+    // Migrado: las copias del formato anterior ya no hacen falta.
+    try {
+      for (const key of LEGACY_KEYS) localStorage.removeItem(key)
+      await idbWrite([], [LEGACY_KEYS[0]])
+    } catch {
+      /* nada */
+    }
+  }
 })()
 
 /* ---------- Utilidades ---------- */

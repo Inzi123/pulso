@@ -12,40 +12,51 @@ export interface FlowEdge {
   broken: boolean
 }
 
+type RawEdge = Omit<FlowEdge, 'broken'>
+
+// Las pantallas son inmutables: sus salidas por modo se calculan una vez por objeto,
+// y el resultado completo una vez por lista de pantallas. Al arrastrar algo solo se
+// recalcula la pantalla que cambió.
+const screenEdges = new WeakMap<Screen, Map<Id, RawEdge[]>>()
+const projectEdges = new WeakMap<Screen[], Map<Id, FlowEdge[]>>()
+
+function edgesFrom(screen: Screen, modeId: Id): RawEdge[] {
+  let byMode = screenEdges.get(screen)
+  if (!byMode) screenEdges.set(screen, (byMode = new Map()))
+  const cached = byMode.get(modeId)
+  if (cached) return cached
+  const out: RawEdge[] = []
+  const auto = screen.autoAdvance
+  if (auto?.target) {
+    out.push({ id: `${screen.id}:auto`, fromScreenId: screen.id, fromElementId: '', toScreenId: auto.target, action: 'auto' })
+  }
+  for (const el of screen.elements) {
+    const p = resolveProps(el, modeId)
+    if (p.hidden || !p.interaction) continue
+    const { action, target } = p.interaction
+    if ((action !== 'navigate' && action !== 'overlay') || !target) continue
+    out.push({ id: `${screen.id}:${el.id}`, fromScreenId: screen.id, fromElementId: el.id, toScreenId: target, action })
+  }
+  byMode.set(modeId, out)
+  return out
+}
+
 /** Conexiones entre pantallas tal y como se comportan en un modo. */
 export function computeFlows(project: Project, modeId: Id): FlowEdge[] {
+  let byMode = projectEdges.get(project.screens)
+  if (!byMode) projectEdges.set(project.screens, (byMode = new Map()))
+  const cached = byMode.get(modeId)
+  if (cached) return cached
   const byId = new Map(project.screens.map((s) => [s.id, s]))
   const edges: FlowEdge[] = []
   for (const screen of project.screens) {
     if (!isScreenAvailable(screen, modeId)) continue
-    const auto = screen.autoAdvance
-    if (auto?.target) {
-      const dest = byId.get(auto.target)
-      edges.push({
-        id: `${screen.id}:auto`,
-        fromScreenId: screen.id,
-        fromElementId: '',
-        toScreenId: auto.target,
-        action: 'auto',
-        broken: !dest || !isScreenAvailable(dest, modeId),
-      })
-    }
-    for (const el of screen.elements) {
-      const p = resolveProps(el, modeId)
-      if (p.hidden || !p.interaction) continue
-      const { action, target } = p.interaction
-      if ((action !== 'navigate' && action !== 'overlay') || !target) continue
-      const dest = byId.get(target)
-      edges.push({
-        id: `${screen.id}:${el.id}`,
-        fromScreenId: screen.id,
-        fromElementId: el.id,
-        toScreenId: target,
-        action,
-        broken: !dest || !isScreenAvailable(dest, modeId),
-      })
+    for (const e of edgesFrom(screen, modeId)) {
+      const dest = byId.get(e.toScreenId)
+      edges.push({ ...e, broken: !dest || !isScreenAvailable(dest, modeId) })
     }
   }
+  byMode.set(modeId, edges)
   return edges
 }
 
